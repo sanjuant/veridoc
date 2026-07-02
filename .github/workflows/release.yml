@@ -29,7 +29,16 @@ jobs:
       - name: Décoder le keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/veridoc-release.jks"
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret KEYSTORE_BASE64 manquant — configurez KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD avant de pousser un tag v*."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/veridoc-release.jks"
+          if [ ! -s "$RUNNER_TEMP/veridoc-release.jks" ]; then
+            echo "::error::Keystore décodé vide (KEYSTORE_BASE64 invalide ?)."
+            exit 1
+          fi
 
       - name: Build release signé
         env:
@@ -37,15 +46,25 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          VERSION_CODE: ${{ github.run_number }}
         run: |
-          export VERSION_NAME="${GITHUB_REF_NAME#v}"   # v1.0.0 -> 1.0.0
+          VERSION="${GITHUB_REF_NAME#v}"                 # v1.2.3 -> 1.2.3
+          IFS=. read -r MAJ MIN PAT <<< "$VERSION"
+          export VERSION_NAME="$VERSION"
+          # versionCode déterministe et monotone, dérivé du tag (pas du n° de run) :
+          # re-pousser le même tag redonne le même versionCode.
+          export VERSION_CODE=$(( ${MAJ:-0} * 1000000 + ${MIN:-0} * 1000 + ${PAT:-0} ))
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Renommer l'APK avec la version
+      - name: Vérifier la signature
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -n1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/veridoc-release.apk
+
+      - name: Préparer l'artefact
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/veridoc-release.apk "dist/veridoc-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/veridoc-release.apk "dist/veridoc-${VERSION}.apk"
 
       - name: Créer la GitHub Release
         uses: softprops/action-gh-release@v2
