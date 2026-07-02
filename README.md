@@ -133,7 +133,7 @@ environnement sans SDK Android ni accès aux dépôts Google/Maven — voici deu
 1. Crée un dépôt GitHub et pousse tout ce dossier.
 2. Le workflow `.github/workflows/build-apk.yml` se lance à chaque push (ou à la main
    via l'onglet **Actions**).
-3. Une fois le job terminé, télécharge l'artefact **cnie-debug-apk** : c'est l'APK.
+3. Une fois le job terminé, télécharge l'artefact **veridoc-debug-apk** : c'est l'APK.
 
 Le runner GitHub fournit le SDK Android et Gradle ; aucun outil local requis.
 

@@ -40,6 +40,11 @@ android {
     }
 }
 
+base {
+    // Nom des artefacts de build : produit veridoc-debug.apk au lieu de app-debug.apk.
+    archivesName.set("veridoc")
+}
+
 dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.core:core-ktx:1.13.1")
