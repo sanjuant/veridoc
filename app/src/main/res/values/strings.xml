@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Lecteur eID</string>
-    <string name="header_title">Lecteur eID NFC</string>
-    <string name="header_subtitle">Carte d\'identité française &amp; passeport ICAO</string>
+    <string name="app_name">Véridoc</string>
+    <string name="header_title">Véridoc</string>
+    <string name="header_subtitle">Lecture et vérification NFC · CNIe &amp; passeport</string>
 
     <!-- Sélecteur de mode -->
     <string name="mode_id">Carte d\'identité</string>
