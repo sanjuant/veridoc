@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lecteur CNIe</string>
+    <string name="hint_tap">Saisis le CAN puis approche la carte du dos du téléphone, sans bouger.</string>
+    <string name="no_nfc">NFC indisponible sur cet appareil.</string>
+    <string name="not_isodep">Puce non compatible (IsoDep attendu).</string>
+    <string name="enter_can">Saisis d\'abord le CAN (6 chiffres).</string>
+    <string name="reading">Lecture en cours…</string>
+    <string name="done">Lecture terminée.</string>
+    <string name="read_error">Échec : %1$s</string>
+</resources>

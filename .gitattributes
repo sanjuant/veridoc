@@ -1,0 +1,15 @@
+# Dépôt multiplateforme (édité sous Windows, buildé sur runner Linux).
+# Normalise en LF dans le dépôt et à la sortie.
+* text=auto eol=lf
+
+# Scripts Windows : CRLF requis.
+*.bat text eol=crlf
+
+# Le wrapper Unix DOIT rester en LF, sinon bash échoue sur le runner Linux.
+gradlew text eol=lf
+
+# Binaires : jamais de conversion de fins de ligne.
+*.jar   binary
+*.png   binary
+*.so    binary
+*.apk   binary
