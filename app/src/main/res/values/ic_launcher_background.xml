@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond de l'icône : bleu de marque, FIXE (pas de variante -night : une icône
+         de lanceur ne doit pas changer avec le thème système). -->
+    <color name="ic_launcher_bg">#0B5FB0</color>
+</resources>

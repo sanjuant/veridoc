@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Repli Android 7 (API 24-25, pas d'icône adaptative) : icône complète,
+         fond bleu arrondi + bouclier + coche. -->
+    <path
+        android:fillColor="#0B5FB0"
+        android:pathData="M0,28 C0,12.5 12.5,0 28,0 L80,0 C95.5,0 108,12.5 108,28 L108,80 C108,95.5 95.5,108 80,108 L28,108 C12.5,108 0,95.5 0,80 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,33 L74,40 L74,57 C74,69 65,79 54,83 C43,79 34,69 34,57 L34,40 Z" />
+    <path
+        android:strokeColor="#0B5FB0"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M45,58 L52,65 L65,49" />
+</vector>
