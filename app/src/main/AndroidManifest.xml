@@ -6,8 +6,8 @@
 
     <application
         android:allowBackup="false"
-        android:label="Lecteur CNIe"
-        android:theme="@style/Theme.AppCompat.DayNight">
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Cnie">
 
         <activity
             android:name=".MainActivity"

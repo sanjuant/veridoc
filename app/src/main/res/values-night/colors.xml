@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rôles Material 3 — valeurs mode sombre (contraste adapté). -->
+    <color name="brand_primary">#A6C8FF</color>
+    <color name="on_primary">#00315D</color>
+    <color name="primary_container">#234A76</color>
+    <color name="on_primary_container">#D4E3FF</color>
+
+    <color name="ok_container">#274E2B</color>
+    <color name="on_ok_container">#C7E7C9</color>
+    <color name="bad_container">#93000A</color>
+    <color name="on_bad_container">#FFDAD6</color>
+    <color name="neutral_container">#44464F</color>
+    <color name="on_neutral_container">#E2E2EC</color>
+</resources>

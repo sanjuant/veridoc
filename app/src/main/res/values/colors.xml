@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rôles Material 3 — valeurs mode clair. Variante sombre dans values-night/. -->
+    <color name="brand_primary">#0B5FB0</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#D4E3FF</color>
+    <color name="on_primary_container">#001B3D</color>
+
+    <!-- États de vérification (intégrité / signature) -->
+    <color name="ok_container">#C7E7C9</color>
+    <color name="on_ok_container">#0B3D14</color>
+    <color name="bad_container">#FFDAD6</color>
+    <color name="on_bad_container">#410002</color>
+    <color name="neutral_container">#E2E2EC</color>
+    <color name="on_neutral_container">#1A1B22</color>
+</resources>

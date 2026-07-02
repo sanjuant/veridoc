@@ -7,25 +7,56 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
+import android.provider.Settings
+import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.ColorRes
+import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.chip.Chip
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.imageview.ShapeableImageView
+import com.google.android.material.progressindicator.CircularProgressIndicator
+import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.security.Security
 
 class MainActivity : AppCompatActivity() {
 
-    private var nfcAdapter: NfcAdapter? = null
+    private enum class Mode { ID, PASSPORT }
 
-    private lateinit var canInput: EditText
+    private var nfcAdapter: NfcAdapter? = null
+    private var mode: Mode = Mode.ID
+    private var readJob: Job? = null
+
+    private lateinit var modeGroup: MaterialButtonToggleGroup
+    private lateinit var groupCan: View
+    private lateinit var groupMrz: View
+    private lateinit var canInput: TextInputEditText
+    private lateinit var docInput: TextInputEditText
+    private lateinit var dobInput: TextInputEditText
+    private lateinit var expInput: TextInputEditText
+
     private lateinit var status: TextView
-    private lateinit var mrzView: TextView
-    private lateinit var photoView: ImageView
+    private lateinit var statusIcon: ImageView
+    private lateinit var progress: CircularProgressIndicator
+
+    private lateinit var resultCard: MaterialCardView
+    private lateinit var photo: ShapeableImageView
+    private lateinit var nameView: TextView
+    private lateinit var fields: TextView
+    private lateinit var extra: TextView
+    private lateinit var chipIntegrity: Chip
+    private lateinit var chipSignature: Chip
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,26 +66,74 @@ class MainActivity : AppCompatActivity() {
         Security.removeProvider("BC")
         Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
 
+        modeGroup = findViewById(R.id.modeGroup)
+        groupCan = findViewById(R.id.groupCan)
+        groupMrz = findViewById(R.id.groupMrz)
         canInput = findViewById(R.id.canInput)
+        docInput = findViewById(R.id.docInput)
+        dobInput = findViewById(R.id.dobInput)
+        expInput = findViewById(R.id.expInput)
         status = findViewById(R.id.status)
-        mrzView = findViewById(R.id.mrz)
-        photoView = findViewById(R.id.photo)
-        findViewById<Button>(R.id.help).setOnClickListener {
-            status.text = getString(R.string.hint_tap)
+        statusIcon = findViewById(R.id.statusIcon)
+        progress = findViewById(R.id.progress)
+        resultCard = findViewById(R.id.resultCard)
+        photo = findViewById(R.id.photo)
+        nameView = findViewById(R.id.name)
+        fields = findViewById(R.id.fields)
+        extra = findViewById(R.id.extra)
+        chipIntegrity = findViewById(R.id.chipIntegrity)
+        chipSignature = findViewById(R.id.chipSignature)
+
+        modeGroup.check(R.id.btnModeId)
+        modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            applyMode(if (checkedId == R.id.btnModePassport) Mode.PASSPORT else Mode.ID)
+        }
+        applyMode(Mode.ID)
+
+        findViewById<MaterialButton>(R.id.help).setOnClickListener {
+            // Aide dans une boîte de dialogue : ne détruit plus le fil d'état ni le hint.
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.help)
+                .setMessage(R.string.help_text)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
         }
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-        if (nfcAdapter == null) status.text = getString(R.string.no_nfc)
+    }
+
+    private fun applyMode(newMode: Mode) {
+        mode = newMode
+        val passport = newMode == Mode.PASSPORT
+        groupCan.visibility = if (passport) View.GONE else View.VISIBLE
+        groupMrz.visibility = if (passport) View.VISIBLE else View.GONE
+        // Changer de mode ramène à l'état idle (sinon l'ancien résultat resterait affiché).
+        resultCard.visibility = View.GONE
+        showIdle()
     }
 
     override fun onResume() {
         super.onResume()
-        val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-        val pending = PendingIntent.getActivity(this, 0, intent, flags)
-        val filters = arrayOf(IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED))
-        val techLists = arrayOf(arrayOf(IsoDep::class.java.name))
-        nfcAdapter?.enableForegroundDispatch(this, pending, filters, techLists)
+        val adapter = nfcAdapter
+        when {
+            adapter == null -> setStatus(getString(R.string.no_nfc), R.drawable.ic_state_error, R.color.on_bad_container)
+            !adapter.isEnabled -> {
+                setStatus(getString(R.string.nfc_disabled), R.drawable.ic_state_error, R.color.on_bad_container)
+                status.setOnClickListener { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }
+            }
+            else -> {
+                status.setOnClickListener(null)
+                status.isClickable = false
+                if (resultCard.visibility != View.VISIBLE) showIdle()
+                val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                val pending = PendingIntent.getActivity(this, 0, intent, flags)
+                val filters = arrayOf(IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED))
+                val techLists = arrayOf(arrayOf(IsoDep::class.java.name))
+                adapter.enableForegroundDispatch(this, pending, filters, techLists)
+            }
+        }
     }
 
     override fun onPause() {
@@ -64,52 +143,146 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Ignorer tout nouveau tap tant qu'une lecture est en cours : évite deux transceive
+        // concurrents sur le même canal IsoDep et l'écrasement d'un résultat déjà affiché.
+        if (readJob?.isActive == true) return
+
         val tag: Tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG) ?: return
         val isoDep = IsoDep.get(tag) ?: run {
-            status.text = getString(R.string.not_isodep); return
+            setStatus(getString(R.string.not_isodep), R.drawable.ic_state_error, R.color.on_bad_container); return
         }
 
-        val can = canInput.text.toString().trim()
-        if (can.length != 6 || !can.all { it.isDigit() }) {
-            status.text = getString(R.string.enter_can); return
-        }
+        val key = buildAccessKey() ?: return
 
-        status.text = getString(R.string.reading)
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = runCatching { CnieReader().read(isoDep, can) }
+        showReading()
+        resultCard.visibility = View.GONE
+
+        readJob = lifecycleScope.launch(Dispatchers.IO) {
+            val result = runCatching { CnieReader().read(isoDep, key) }
             withContext(Dispatchers.Main) {
                 result
                     .onSuccess { showResult(it) }
-                    .onFailure { status.text = getString(R.string.read_error, it.message ?: "?") }
+                    .onFailure {
+                        setStatus(
+                            getString(R.string.read_error, it.message ?: "?"),
+                            R.drawable.ic_state_error,
+                            R.color.on_bad_container,
+                        )
+                    }
+            }
+        }
+    }
+
+    /** Construit la clé d'accès selon le mode, ou affiche une erreur de saisie et renvoie null. */
+    private fun buildAccessKey(): AccessKey? = when (mode) {
+        Mode.ID -> {
+            val can = canInput.text?.toString()?.trim().orEmpty()
+            if (can.length != 6 || !can.all { it.isDigit() }) {
+                warn(getString(R.string.enter_can)); null
+            } else {
+                AccessKey.Can(can)
+            }
+        }
+
+        Mode.PASSPORT -> {
+            val doc = docInput.text?.toString()?.trim()?.uppercase().orEmpty()
+            val dob = dobInput.text?.toString()?.trim().orEmpty()
+            val exp = expInput.text?.toString()?.trim().orEmpty()
+            val datesOk = dob.length == 6 && dob.all { it.isDigit() } &&
+                exp.length == 6 && exp.all { it.isDigit() }
+            if (doc.isEmpty() || !datesOk) {
+                warn(getString(R.string.enter_mrz)); null
+            } else {
+                AccessKey.Mrz(doc, dob, exp)
             }
         }
     }
 
     private fun showResult(r: ReadResult) {
-        mrzView.text = buildString {
-            appendLine("${r.surname} ${r.givenNames}")
-            appendLine("Doc : ${r.documentNumber}   Nat : ${r.nationality}")
-            appendLine("Naissance : ${r.dateOfBirth}")
+        nameView.text = "${r.surname} ${r.givenNames}".trim()
 
-            r.dg13?.let { dg13 ->
-                appendLine()
-                dg13.heightCm?.let { appendLine("Taille : $it cm") }
-                dg13.address?.let { a ->
-                    val ligne = listOfNotNull(a.street, a.postalCode, a.city, a.country)
-                        .joinToString(", ")
-                    if (ligne.isNotEmpty()) appendLine("Adresse : $ligne")
-                }
-                dg13.birthPlace?.let { b ->
-                    val lieu = listOfNotNull(b.city, b.department).joinToString(", ")
-                    if (lieu.isNotEmpty()) appendLine("Lieu de naissance : $lieu")
-                }
-            }
-
-            appendLine()
-            appendLine("Intégrité (hashs = SOD) : ${if (r.hashesMatchSod) "OK" else "ÉCHEC"}")
-            append("Signature SOD (CSCA)     : ${if (r.sodSignatureVerified) "OK" else "non vérifiée"}")
+        // Champs à caractères fixes en monospace (alignement des chiffres).
+        fields.text = buildString {
+            appendLine("Doc : ${r.documentNumber}    Nat : ${r.nationality}")
+            append("Naissance : ${r.dateOfBirth}")
+            r.dg13?.heightCm?.let { append("\nTaille : $it cm") }
         }
-        r.photo?.let { photoView.setImageBitmap(it) }
-        status.text = getString(R.string.done)
+
+        // Texte libre (adresse, lieu de naissance) en police proportionnelle, lisible.
+        val extraText = buildString {
+            r.dg13?.address?.let { a ->
+                val ligne = listOfNotNull(a.street, a.postalCode, a.city, a.country).joinToString(", ")
+                if (ligne.isNotEmpty()) appendLine("Adresse : $ligne")
+            }
+            r.dg13?.birthPlace?.let { b ->
+                val lieu = listOfNotNull(b.city, b.department).joinToString(", ")
+                if (lieu.isNotEmpty()) append("Lieu de naissance : $lieu")
+            }
+        }.trim()
+        extra.text = extraText
+        extra.visibility = if (extraText.isEmpty()) View.GONE else View.VISIBLE
+
+        setChip(
+            chipIntegrity,
+            ok = r.hashesMatchSod,
+            okText = R.string.chip_integrity_ok,
+            koText = R.string.chip_integrity_bad,
+            neutralIfNotOk = false,
+        )
+        setChip(
+            chipSignature,
+            ok = r.sodSignatureVerified,
+            okText = R.string.chip_sig_ok,
+            koText = R.string.chip_sig_unverified,
+            neutralIfNotOk = true, // non vérifiée != invalide (trust store CSCA non branché)
+        )
+
+        photo.visibility = if (r.photo != null) View.VISIBLE else View.GONE
+        r.photo?.let { photo.setImageBitmap(it) }
+
+        resultCard.visibility = View.VISIBLE
+        val allOk = r.hashesMatchSod
+        setStatus(
+            getString(R.string.done),
+            if (allOk) R.drawable.ic_state_ok else R.drawable.ic_state_error,
+            if (allOk) R.color.on_ok_container else R.color.on_bad_container,
+        )
+    }
+
+    // --- Helpers d'état de la carte de statut ---
+
+    private fun showIdle() = setStatus(
+        getString(if (mode == Mode.PASSPORT) R.string.hint_passport else R.string.hint_id),
+        R.drawable.ic_state_info,
+        R.color.on_neutral_container,
+    )
+
+    private fun warn(text: String) =
+        setStatus(text, R.drawable.ic_state_error, R.color.on_bad_container)
+
+    private fun showReading() {
+        progress.visibility = View.VISIBLE
+        statusIcon.visibility = View.GONE
+        status.text = getString(R.string.reading)
+    }
+
+    private fun setStatus(text: String, @DrawableRes icon: Int, @ColorRes tint: Int) {
+        progress.visibility = View.GONE
+        statusIcon.visibility = View.VISIBLE
+        statusIcon.setImageResource(icon)
+        statusIcon.setColorFilter(ContextCompat.getColor(this, tint))
+        status.text = text
+    }
+
+    /** Colore un chip : vert (OK), rouge (échec) ou neutre (état indéterminé). */
+    private fun setChip(chip: Chip, ok: Boolean, @androidx.annotation.StringRes okText: Int, @androidx.annotation.StringRes koText: Int, neutralIfNotOk: Boolean) {
+        val (bg, fg, text) = when {
+            ok -> Triple(R.color.ok_container, R.color.on_ok_container, okText)
+            neutralIfNotOk -> Triple(R.color.neutral_container, R.color.on_neutral_container, koText)
+            else -> Triple(R.color.bad_container, R.color.on_bad_container, koText)
+        }
+        chip.text = getString(text)
+        chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, bg))
+        chip.setTextColor(ContextCompat.getColor(this, fg))
     }
 }

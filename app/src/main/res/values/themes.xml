@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Thème Material 3, clair/sombre automatique. Les couleurs de surface viennent
+         des valeurs baseline M3 (correctes dans les deux modes) ; on ne surcharge que
+         la couleur de marque, référencée via @color/... (variante dans values-night). -->
+    <style name="Theme.Cnie" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+    </style>
+
+    <!-- Coins arrondis de la photo lue sur la puce. -->
+    <style name="RoundedPhoto">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+</resources>

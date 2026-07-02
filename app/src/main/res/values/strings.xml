@@ -1,11 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Lecteur CNIe</string>
-    <string name="hint_tap">Saisis le CAN puis approche la carte du dos du téléphone, sans bouger.</string>
+    <string name="app_name">Lecteur eID</string>
+    <string name="header_title">Lecteur eID NFC</string>
+    <string name="header_subtitle">Carte d\'identité française &amp; passeport ICAO</string>
+
+    <!-- Sélecteur de mode -->
+    <string name="mode_id">Carte d\'identité</string>
+    <string name="mode_passport">Passeport</string>
+
+    <!-- Champs CNIe -->
+    <string name="can_hint">CAN — 6 chiffres</string>
+    <string name="can_helper">Les 6 chiffres imprimés au recto de la carte.</string>
+
+    <!-- Champs passeport (clé MRZ) -->
+    <string name="doc_hint">N° du document</string>
+    <string name="doc_helper">Sans espaces, tel qu\'imprimé (ex. 19FR12345).</string>
+    <string name="dob_hint">Naissance — AAMMJJ</string>
+    <string name="exp_hint">Expiration — AAMMJJ</string>
+    <string name="mrz_helper">Repris de la MRZ (2 lignes en bas du passeport). Dates au format Année-Mois-Jour.</string>
+
+    <!-- Statuts -->
+    <string name="hint_id">Saisis le CAN, puis approche la carte du dos du téléphone, sans bouger.</string>
+    <string name="hint_passport">Saisis les 3 champs MRZ, puis approche le passeport du dos du téléphone.</string>
     <string name="no_nfc">NFC indisponible sur cet appareil.</string>
+    <string name="nfc_disabled">NFC désactivé. Touche ici pour ouvrir les réglages NFC.</string>
     <string name="not_isodep">Puce non compatible (IsoDep attendu).</string>
     <string name="enter_can">Saisis d\'abord le CAN (6 chiffres).</string>
-    <string name="reading">Lecture en cours…</string>
+    <string name="enter_mrz">Renseigne le n° de document et les 2 dates (AAMMJJ).</string>
+    <string name="reading">Lecture en cours… garde le document immobile.</string>
     <string name="done">Lecture terminée.</string>
     <string name="read_error">Échec : %1$s</string>
+
+    <!-- Aide -->
+    <string name="help">Comment scanner ?</string>
+    <string name="help_text">Antenne NFC souvent au centre/haut du dos. Retire la coque, pose le document bien à plat contre le téléphone et ne bouge pas pendant la lecture.</string>
+
+    <!-- Résultat -->
+    <string name="photo_desc">Photo lue sur la puce</string>
+    <string name="chip_integrity_ok">Intégrité OK</string>
+    <string name="chip_integrity_bad">Intégrité ÉCHEC</string>
+    <string name="chip_sig_ok">Signature OK</string>
+    <string name="chip_sig_unverified">Signature non vérifiée</string>
 </resources>
