@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "fr.example.cnie"
+    namespace = "fr.veridoc.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "fr.example.cnie"
+        applicationId = "fr.veridoc.app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

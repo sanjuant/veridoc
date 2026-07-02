@@ -1,4 +1,4 @@
-package fr.example.cnie
+package fr.veridoc.app
 
 /**
  * Parser best-effort du DG13 de la CNI française.

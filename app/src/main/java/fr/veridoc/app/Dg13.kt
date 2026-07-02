@@ -1,4 +1,4 @@
-package fr.example.cnie
+package fr.veridoc.app
 
 /**
  * Données extraites du DG13 de la CNI française (spécifique France, non standard ICAO).

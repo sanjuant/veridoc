@@ -1,4 +1,4 @@
-package fr.example.cnie
+package fr.veridoc.app
 
 import android.graphics.Bitmap
 import android.nfc.tech.IsoDep

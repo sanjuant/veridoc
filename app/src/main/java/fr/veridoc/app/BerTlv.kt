@@ -1,4 +1,4 @@
-package fr.example.cnie
+package fr.veridoc.app
 
 /**
  * Lecteur BER-TLV minimal. Port de `cnie/tlv.py` de cnie-python-tools :

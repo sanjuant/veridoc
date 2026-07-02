@@ -1,4 +1,4 @@
-package fr.example.cnie
+package fr.veridoc.app
 
 /**
  * Clé d'accès à la puce eMRTD (ICAO 9303).

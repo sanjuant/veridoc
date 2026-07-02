@@ -28,7 +28,7 @@ document pour lequel JMRTD a été écrit. La seule différence est la **clé d'
 Une fois la session ouverte, **DG1 (MRZ)**, **DG2 (photo)** et **EF.SOD** se lisent de
 façon identique ; le **DG13** est propre à la France et sera simplement absent d'un
 passeport. Le choix de mode se fait dans l'UI ; le code de clé est dans
-[`AccessKey.kt`](app/src/main/java/fr/example/cnie/AccessKey.kt) et l'ouverture de session
+[`AccessKey.kt`](app/src/main/java/fr/veridoc/app/AccessKey.kt) et l'ouverture de session
 dans `CnieReader.openWithCan` / `openWithMrz`.
 
 L'interface est en **Material 3** (thème clair/sombre, sélecteur de mode, carte résultat
@@ -109,7 +109,7 @@ Points à assumer honnêtement en réunion :
 ```
 app/src/main/
 ├── AndroidManifest.xml
-├── java/fr/example/cnie/
+├── java/fr/veridoc/app/
 │   ├── MainActivity.kt      # UI Material 3, sélecteur de mode, dispatch NFC, lancement lecture
 │   ├── AccessKey.kt         # clé d'accès : Can(can) pour la CNIe, Mrz(...) pour le passeport
 │   ├── CnieReader.kt        # PACE-CAN / PACE-MRZ+BAC + lecture DG1/DG2/DG13 + passive auth
