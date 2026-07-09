@@ -16,7 +16,6 @@ AE_UAE-CSCA-01_icao-bsi_3bbf823a.pem	AE	CN=UAE CSCA 01,OU=EPASS,O=MOI,C=AE	2017-
 AE_UAE-CSCA-01_icao-bsi_ced14936.pem	AE	CN=UAE CSCA 01,OU=EPASS,O=MOI,C=AE	2017-10-05	2026-12-05	ced149361a312f669f3fc572848f8a1bb8b6b10ec92d7295fb636cab7ae41d35	icao+bsi
 AE_UAE-CSCA-01_icao-bsi_418add13.pem	AE	CN=UAE CSCA 01,OU=EPASS,O=MOI,C=AE	2021-09-22	2030-11-22	418add13f6e4c9150f6363d4cf0a070900066919802d3a424b41a6f379ff1cd9	icao+bsi
 AE_UAE-CSCA-01_icao-bsi_a287612e.pem	AE	CN=UAE CSCA 01,OU=EPASS,O=MOI,C=AE	2021-09-22	2030-11-22	a287612e7401eedb3ad5d48258296dc9ab6f16c33ff6863d1ad005613e57ef0e	icao+bsi
-AE_UAE-CSCA-02_icao-bsi_d0e477b5.pem	AE	CN=UAE CSCA 02,OU=EPASS,O=MOI,C=AE	2022-03-01	2037-06-01	d0e477b5de01ee68dedbbf5992e66c7091e7134df0449939f496fe7ca64361fb	icao+bsi
 AG_csca-antigua_bsi_6974f026.pem	AG	CN=csca-antigua,OU=pcd,O=gov,C=AG	2017-03-29	2032-09-29	6974f02662049ba8e5a11a504f64184318e5cff784fccaa7651ae5511ecdefad	bsi
 AG_csca-antigua_bsi_e75953b4.pem	AG	CN=csca-antigua,OU=pcd,O=gov,C=AG	2022-06-07	2037-12-07	e75953b43ed2abccb09dee192e954d7e6051f147eebe803cf7758fb5ddc26515	bsi
 AL_CSCA-ALB_icao-bsi_290959a0.pem	AL	C=AL,O=GOV,OU=Ministry of Interior,CN=CSCA ALB,2.5.4.5=5	2025-01-29	2040-05-01	290959a04d0269b16ad5270d18ae35e280ad947b61663024fc9c8dd4bfac4304	icao+bsi
@@ -28,9 +27,7 @@ AT_CSCA-AUSTRIA_bsi_1c125bb1.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2011-04-15	
 AT_CSCA-AUSTRIA_icao-bsi_c8d2452d.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2011-04-15	2026-07-19	c8d2452d099f6bea26b3d023d7ada9349f8fee43a5b20947a1b43a3cb81e6842	icao+bsi
 AT_CSCA-AUSTRIA_icao-bsi_3c2801f9.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2014-10-02	2026-07-19	3c2801f9fd2c32aebf92d3f3dfc84bd69619b9319fc329ba83a05a3892044873	icao+bsi
 AT_CSCA-AUSTRIA_icao-bsi_bb6eff59.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2014-10-02	2030-01-05	bb6eff5957af93fc4dc2448a0db3f58715b8e19d17ed0ff28d71fa1a6da0529e	icao+bsi
-AT_CSCA-AUSTRIA_icao-bsi_20914525.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2019-09-02	2030-01-05	2091452526056ee68f3ed11c819a68475bd6bd7f738fbb81ed8d285afc058f9c	icao+bsi
 AT_CSCA-AUSTRIA_icao-bsi_a14e95eb.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2019-09-02	2034-12-06	a14e95ebf0b5aa4e73c3030120d9d3309d1c239b35fbbb5549073f29c30f570f	icao+bsi
-AT_CSCA-AUSTRIA_icao-bsi_0e25cff1.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2024-08-19	2034-12-06	0e25cff1cc760f97d2acf96f5816a0ee913d151419f3478b07d72e5bb791f63b	icao+bsi
 AT_CSCA-AUSTRIA_icao-bsi_1763ae21.pem	AT	CN=CSCA-AUSTRIA,OU=BMI,O=GV,C=AT	2024-08-19	2039-11-23	1763ae21ba75dc3e830f4c5cde7cfcdfae560981762fb0acd67936a10910aff3	icao+bsi
 AU_Passport-Country-Signing-Authority_icao_af5f6736.pem	AU	CN=Passport Country Signing Authority,OU=PTB,OU=DFAT,O=GOV,C=AU	2005-09-02	2020-09-02	af5f67369d078176eac3b06c084ffc496423f8ef70a4c840482008b3490d6a68	icao
 AU_Passport-Country-Signing-Authority_icao_9478eddf.pem	AU	CN=Passport Country Signing Authority,OU=PTB,OU=DFAT,O=GOV,C=AU	2008-05-23	2023-05-23	9478eddfd425c9ed7042b8a7c85c9250c41b62d8201e98c0764eb6a6ad532242	icao
@@ -207,7 +204,6 @@ CZ_CSCA_CZ_icao-bsi_85c0ea24.pem	CZ	CN=CSCA_CZ,OU=Ministry of Interior,O=Czech R
 CZ_CSCA_CZ_icao-bsi_15210bd4.pem	CZ	CN=CSCA_CZ,OU=Ministry of Interior,O=Czech Republic,C=CZ	2026-03-19	2036-06-23	15210bd45d9f7657b954081b100f0be1f3dff2b93fb9a6a8f8007476c0da4759	icao+bsi
 CZ_CSCA_CZ_icao-bsi_84b71a4b.pem	CZ	CN=CSCA_CZ,OU=Ministry of Interior,O=Czech Republic,C=CZ	2026-03-19	2041-06-19	84b71a4b0f8007df8518f0536e16fa186a2264e64e08967699eea2a33cd2ea51	icao+bsi
 DE_csca-germany_icao_efc010f1.pem	DE	CN=csca-germany,2.5.4.5=001,OU=bsi,O=bund,C=DE	2005-08-08	2019-02-08	efc010f12201004da56325a9535b856590c1f1e124e0dad64119ae0269f52161	icao
-DE_csca-germany_icao_e15ea423.pem	DE	CN=csca-germany,2.5.4.5=013,OU=bsi,O=bund,C=DE	2008-02-26	2021-08-26	e15ea42388498587f518cb2ab07e9e4acd5c4a2f8d3cfcc839d52a6b070631a5	icao
 DE_csca-germany_icao_48aefb4d.pem	DE	CN=csca-germany,2.5.4.5=100,OU=bsi,O=bund,C=DE	2011-01-17	2024-07-17	48aefb4d99354d4c02f531e8cda93de54eb8181c020735038f492809927ad683	icao
 DE_csca-germany_icao-bsi_7f3835cb.pem	DE	CN=csca-germany,2.5.4.5=101,OU=bsi,O=bund,C=DE	2013-10-30	2027-04-30	7f3835cb1d2cc592535b7f8067a290eb4243e3807191eb8c6e38c27de1a229e2	icao+bsi
 DE_csca-germany_icao_f510570c.pem	DE	CN=csca-germany,2.5.4.5=101,OU=bsi,O=bund,C=DE	2013-11-11	2024-07-17	f510570cccece9f916b31507284bbdb5306aa6f5777d3e3daf7594ecda70c02e	icao
@@ -385,10 +381,7 @@ JP_e-passportCSCA_bsi_4bfdbf58.pem	JP	CN=e-passportCSCA,OU=The Ministry of Forei
 JP_e-passportCSCA_icao-bsi_764b5259.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2013-05-14	2029-05-14	764b5259b64dc7d34d7695080f8d9d523acdb45e8436d32e3019033955066b4c	icao+bsi
 JP_e-passportCSCA_icao-bsi_5434b41e.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2015-02-20	2031-02-20	5434b41ed095630d193572ff0fe821a1382fbc35051fd696ae66a00738145d8b	icao+bsi
 JP_e-passportCSCA_icao-bsi_a7e54d10.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2015-02-20	2031-02-19	a7e54d10482488d6dcf8dbda88ed345d1fb04a35a8d486042e31d463b4e597f4	icao+bsi
-JP_e-passportCSCA_icao-bsi_493260e5.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2019-06-19	2035-06-19	493260e5d98322b0cf61eabcaf5fe34e182a9b82f862f8555e431a8268f984f1	icao+bsi
 JP_e-passportCSCA_icao-bsi_5284a035.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2019-06-19	2031-02-20	5284a0357d622d92142a12acc4fb3d2c4df2d22003d559f6d22b29f1c1b3d0ab	icao+bsi
-JP_e-passportCSCA_icao-bsi_517722e5.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2024-04-15	2035-06-19	517722e5866363fcdda01ec864305fdc8eec4111757ce641a9ca2be27052120f	icao+bsi
-JP_e-passportCSCA_icao-bsi_fafc46eb.pem	JP	CN=e-passportCSCA,OU=The Ministry of Foreign Affairs,O=Japanese Government,C=JP	2024-04-15	2040-04-16	fafc46eb6f3c31767f70a65295cf8c6073ba2a46ce7ee60538342a0ed53007be	icao+bsi
 KE_Kenya-Country-Signing-CA_icao-bsi_c922dd6d.pem	KE	C=KE,O=ICTA,OU=KenyaGovernmentCertificationAuthority,CN=Kenya Country Signing CA	2017-08-22	2032-11-23	c922dd6d9d88725a735c3b903042edcc469ea68489c0f9e73991a1a33041700b	icao+bsi
 KE_Kenya-Country-Signing-CA_icao-bsi_9f783db0.pem	KE	C=KE,O=ICTA,OU=KenyaGovernmentCertificationAuthority,CN=Kenya Country Signing CA	2019-08-23	2034-11-24	9f783db082c2d5721084fe9f8c2ec38ab785fd36f71ab8f715e059e42fb93f33	icao+bsi
 KE_Kenya-Country-Signing-CA_icao-bsi_ed2f5f01.pem	KE	C=KE,O=ICTA,OU=KenyaGovernmentCertificationAuthority,CN=Kenya Country Signing CA	2021-08-24	2036-11-25	ed2f5f018d25c63aa153fc3dfd0962fc24f930e172c1085f76f1dec34e2e6468	icao+bsi
