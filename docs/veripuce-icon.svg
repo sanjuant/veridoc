@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Veripuce">
+  <!-- Rounded square background -->
+  <rect x="0" y="0" width="512" height="512" rx="104" ry="104" fill="#0F2643"/>
+
+  <!-- ================= SHIELD =================
+       Two rounded shoulders (high points) with a soft central notch,
+       tapering to a rounded point at the bottom. -->
+  <path d="M256 90
+           L392 150
+           L392 282
+           C392 356 330 404 256 424
+           C182 404 120 356 120 282
+           L120 150
+           Z"
+        fill="none" stroke="#F3F4F6" stroke-width="15"
+        stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- ================= MICROCHIP ================= -->
+  <!-- Pins -->
+  <g stroke="#F3F4F6" stroke-width="11" stroke-linecap="round">
+    <line x1="226" y1="176" x2="226" y2="200"/>
+    <line x1="256" y1="176" x2="256" y2="200"/>
+    <line x1="286" y1="176" x2="286" y2="200"/>
+    <line x1="226" y1="310" x2="226" y2="332"/>
+    <line x1="256" y1="310" x2="256" y2="332"/>
+    <line x1="286" y1="310" x2="286" y2="332"/>
+    <line x1="178" y1="226" x2="202" y2="226"/>
+    <line x1="178" y1="252" x2="202" y2="252"/>
+    <line x1="178" y1="278" x2="202" y2="278"/>
+    <line x1="310" y1="226" x2="334" y2="226"/>
+    <line x1="310" y1="252" x2="334" y2="252"/>
+    <line x1="310" y1="278" x2="334" y2="278"/>
+  </g>
+
+  <!-- Chip outer square -->
+  <rect x="202" y="200" width="108" height="108" rx="14" ry="14" fill="none" stroke="#F3F4F6" stroke-width="13"/>
+  <!-- Chip inner die -->
+  <rect x="228" y="226" width="56" height="56" rx="9" ry="9" fill="#C8A35C"/>
+
+  <!-- ================= CHECK MARK (curved, with navy cut-out) ================= -->
+  <path d="M288 350 Q312 384 328 400 Q356 356 412 296"
+        fill="none" stroke="#0F2643" stroke-width="50"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M288 350 Q312 384 328 400 Q356 356 412 296"
+        fill="none" stroke="#24A669" stroke-width="30"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

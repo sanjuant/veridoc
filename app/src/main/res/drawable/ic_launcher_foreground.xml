@@ -1,17 +1,51 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Premier plan de l'icône adaptative : bouclier blanc + coche bleue.
-         Contenu centré dans la zone de sécurité (Android masque les bords). -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,33 L74,40 L74,57 C74,69 65,79 54,83 C43,79 34,69 34,57 L34,40 Z" />
-    <path
-        android:strokeColor="#0B5FB0"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M45,58 L52,65 L65,49" />
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Premier plan de l'icône adaptative : bouclier + puce (die doré) + coche verte.
+         Le trait bleu marine sous la coche « découpe » visuellement le bouclier (même
+         couleur que le fond). Groupe réduit à 82 % pour tenir dans la zone de sécurité
+         (cercle de 66/108 — Android masque les bords selon le lanceur). -->
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.82"
+        android:scaleY="0.82">
+        <!-- Bouclier -->
+        <path
+            android:strokeColor="#F3F4F6"
+            android:strokeWidth="15"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M256,90 L392,150 L392,282 C392,356 330,404 256,424 C182,404 120,356 120,282 L120,150 Z" />
+        <!-- Broches de la puce -->
+        <path
+            android:strokeColor="#F3F4F6"
+            android:strokeWidth="11"
+            android:strokeLineCap="round"
+            android:pathData="M226,176 L226,200 M256,176 L256,200 M286,176 L286,200 M226,310 L226,332 M256,310 L256,332 M286,310 L286,332 M178,226 L202,226 M178,252 L202,252 M178,278 L202,278 M310,226 L334,226 M310,252 L334,252 M310,278 L334,278" />
+        <!-- Boîtier de la puce -->
+        <path
+            android:strokeColor="#F3F4F6"
+            android:strokeWidth="13"
+            android:pathData="M216,200 L296,200 A14,14 0 0 1 310,214 L310,294 A14,14 0 0 1 296,308 L216,308 A14,14 0 0 1 202,294 L202,214 A14,14 0 0 1 216,200 Z" />
+        <!-- Die doré -->
+        <path
+            android:fillColor="#C8A35C"
+            android:pathData="M237,226 L275,226 A9,9 0 0 1 284,235 L284,273 A9,9 0 0 1 275,282 L237,282 A9,9 0 0 1 228,273 L228,235 A9,9 0 0 1 237,226 Z" />
+        <!-- Coche : découpe marine (couleur du fond) puis trait vert -->
+        <path
+            android:strokeColor="#0F2643"
+            android:strokeWidth="50"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M288,350 Q312,384 328,400 Q356,356 412,296" />
+        <path
+            android:strokeColor="#24A669"
+            android:strokeWidth="30"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M288,350 Q312,384 328,400 Q356,356 412,296" />
+    </group>
 </vector>
