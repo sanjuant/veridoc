@@ -61,6 +61,8 @@ class MainActivity : AppCompatActivity() {
     /** Statut posé par le retour de scan : ne pas l'écraser au onResume qui suit. */
     private var statusSetByScan = false
 
+    private lateinit var scanCard: View
+    private lateinit var helpBtn: View
     private lateinit var scanMrz: MaterialButton
     private lateinit var manualToggle: MaterialButton
     private lateinit var manualGroup: View
@@ -168,6 +170,9 @@ class MainActivity : AppCompatActivity() {
         Security.removeProvider("BC")
         Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
 
+        scanCard = findViewById(R.id.scanCard)
+        helpBtn = findViewById(R.id.help)
+        findViewById<MaterialButton>(R.id.newCheck).setOnClickListener { resetToScan() }
         scanMrz = findViewById(R.id.scanMrz)
         manualToggle = findViewById(R.id.manualToggle)
         manualGroup = findViewById(R.id.manualGroup)
@@ -243,10 +248,15 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    /** MRZ détectée : afficher le document reconnu et l'étape suivante (puce). */
+    /**
+     * MRZ détectée : étape 2. On ne montre QUE ce qui sert au conseiller à cet instant —
+     * le document reconnu et l'invite NFC ; la carte de scan et l'aide disparaissent.
+     */
     private fun onMrzScanned(mrz: MrzOcr.MrzData) {
         scanned = mrz
         resultCard.visibility = View.GONE
+        scanCard.visibility = View.GONE
+        helpBtn.visibility = View.GONE
         val isId = mrz.docType == MrzOcr.DocType.ID_CARD
         val typeLabel = when (mrz.docType) {
             MrzOcr.DocType.PASSPORT -> R.string.doc_passport
@@ -282,6 +292,8 @@ class MainActivity : AppCompatActivity() {
         canFallback = false
         detectedCard.visibility = View.GONE
         resultCard.visibility = View.GONE
+        scanCard.visibility = View.VISIBLE
+        helpBtn.visibility = View.VISIBLE
         canInput.text = null
         showIdle()
         statusSetByScan = true
@@ -401,7 +413,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showResult(r: ReadResult) {
-        nfcPrompt.visibility = View.GONE // lecture faite : l'invite NFC n'a plus lieu d'être
+        // Étape 3 : ne laisser à l'écran QUE le verdict + la carte résultat (et le bouton
+        // « Nouveau contrôle ») — tout le reste est du bruit pour le conseiller.
+        nfcPrompt.visibility = View.GONE
+        detectedCard.visibility = View.GONE
+        scanCard.visibility = View.GONE
+        helpBtn.visibility = View.GONE
         nameView.text = "${r.surname} ${r.givenNames}".trim()
         expiredBadge.visibility = if (isExpired(r.dateOfExpiry)) View.VISIBLE else View.GONE
 

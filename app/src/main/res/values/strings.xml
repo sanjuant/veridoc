@@ -64,6 +64,7 @@
     <string name="scan_prompt">Commence par scanner la bande MRZ, en bas du document (2 lignes pour un passeport, 3 pour une carte).</string>
     <string name="manual_entry">Saisie manuelle</string>
     <string name="rescan">Rescanner</string>
+    <string name="new_check">Nouveau contrôle</string>
     <string name="doc_passport">Passeport</string>
     <string name="doc_id_card">Carte d\'identité</string>
     <string name="doc_residence">Titre de séjour</string>
