@@ -1,13 +1,17 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Size
+import android.view.View
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -18,6 +22,7 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -39,18 +44,33 @@ class ScanActivity : AppCompatActivity() {
         const val EXTRA_DOC = "doc"
         const val EXTRA_DOB = "dob"
         const val EXTRA_EXP = "exp"
+        const val EXTRA_DOCTYPE = "doctype"
+        const val EXTRA_STATE = "state"
         const val EXTRA_PERMISSION_DENIED = "permission_denied"
         const val EXTRA_PERMISSION_PERMANENT = "permission_permanent"
         const val EXTRA_CAMERA_UNAVAILABLE = "camera_unavailable"
+        const val EXTRA_MANUAL_REQUESTED = "manual_requested"
     }
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val finished = AtomicBoolean(false)
+    private val hintHandler = Handler(Looper.getMainLooper())
+
+    private var camera: Camera? = null
+    private var torchOn = false
 
     /** Stabilité inter-images : même valeur exigée sur 2 images consécutives. */
     private var lastCan: String? = null
     private var lastMrz: MrzOcr.MrzData? = null
+
+    /** Repli : renvoyer à la saisie manuelle (lumière insuffisante, MRZ illisible…). */
+    private fun requestManualEntry() {
+        if (finished.compareAndSet(false, true)) {
+            setResult(RESULT_CANCELED, Intent().putExtra(EXTRA_MANUAL_REQUESTED, true))
+            finish()
+        }
+    }
 
     private val mode: String get() = intent.getStringExtra(EXTRA_MODE) ?: MODE_MRZ
 
@@ -92,6 +112,19 @@ class ScanActivity : AppCompatActivity() {
                 windowVerticalBias = 0.42f
             }
         }
+
+        // Repli manuel (toujours dispo) et lampe torche (utile en basse lumière).
+        findViewById<MaterialButton>(R.id.scanManual).setOnClickListener { requestManualEntry() }
+        findViewById<MaterialButton>(R.id.scanTorch).setOnClickListener {
+            torchOn = !torchOn
+            camera?.cameraControl?.enableTorch(torchOn)
+            (it as MaterialButton).setIconResource(if (torchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off)
+        }
+
+        // Après un délai sans lecture réussie, suggérer la lampe / la saisie manuelle.
+        hintHandler.postDelayed({
+            if (!finished.get()) findViewById<TextView>(R.id.scanHint).setText(R.string.scan_lowlight)
+        }, 12_000)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
@@ -136,7 +169,10 @@ class ScanActivity : AppCompatActivity() {
                     .build()
                     .also { it.setAnalyzer(analysisExecutor, ::analyze) }
                 provider.unbindAll()
-                provider.bindToLifecycle(this, selector, preview, analysis)
+                camera = provider.bindToLifecycle(this, selector, preview, analysis)
+                // Bouton torche visible seulement si l'appareil a un flash.
+                findViewById<MaterialButton>(R.id.scanTorch).visibility =
+                    if (camera?.cameraInfo?.hasFlashUnit() == true) View.VISIBLE else View.GONE
             } catch (e: Exception) {
                 if (finished.compareAndSet(false, true)) {
                     setResult(RESULT_CANCELED, Intent().putExtra(EXTRA_CAMERA_UNAVAILABLE, true))
@@ -188,6 +224,8 @@ class ScanActivity : AppCompatActivity() {
                         .putExtra(EXTRA_DOC, mrz.documentNumber)
                         .putExtra(EXTRA_DOB, mrz.dateOfBirth)
                         .putExtra(EXTRA_EXP, mrz.dateOfExpiry)
+                        .putExtra(EXTRA_DOCTYPE, mrz.docType.name)
+                        .putExtra(EXTRA_STATE, mrz.issuingState)
                 } else {
                     lastMrz = mrz; null
                 }
@@ -201,6 +239,7 @@ class ScanActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        hintHandler.removeCallbacksAndMessages(null)
         analysisExecutor.shutdown()
         recognizer.close()
     }

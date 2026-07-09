@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Véridoc</string>
-    <string name="header_title">Véridoc</string>
+    <string name="app_name">Veripuce</string>
+    <string name="header_title">Veripuce</string>
     <string name="header_subtitle">Lecture et vérification NFC · CNIe &amp; passeport</string>
 
     <!-- Sélecteur de mode -->
@@ -36,6 +36,9 @@
     <string name="scan_mrz_button">Scanner la MRZ</string>
     <string name="scan_hint_can">Cadre le recto de la carte, bien à plat et éclairé — le CAN (6 chiffres) est détecté automatiquement.</string>
     <string name="scan_hint_mrz">Place la bande MRZ (lignes de caractères et &lt; en bas du document) dans le cadre, bien à plat et éclairée. Astuce : tourne le téléphone en paysage pour plus de précision.</string>
+    <string name="scan_lowlight">Lecture difficile ? Allume la lampe (icône en bas), rapproche-toi, ou passe à la saisie manuelle.</string>
+    <string name="scan_manual_button">Saisie manuelle</string>
+    <string name="scan_torch">Lampe torche</string>
     <string name="camera_denied">Caméra refusée — tu peux saisir les champs à la main.</string>
     <string name="camera_blocked">Caméra bloquée dans les réglages Android — saisis les champs à la main, ou réactive-la dans Paramètres &gt; Applications.</string>
     <string name="camera_unavailable">Caméra indisponible sur cet appareil — saisis les champs à la main.</string>
@@ -44,7 +47,7 @@
     <!-- Confidentialité -->
     <string name="privacy_badge">100 % local — rien n\'est envoyé, rien n\'est conservé</string>
     <string name="privacy_title">Confidentialité</string>
-    <string name="privacy_text">Véridoc fonctionne entièrement sur ton téléphone :\n\n• Lecture NFC, scan caméra et vérifications sont exécutés localement, hors connexion.\n\n• Aucune donnée n\'est transmise à un serveur : l\'application ne possède pas la permission Internet — elle est techniquement incapable d\'envoyer quoi que ce soit.\n\n• Rien n\'est conservé : aucune donnée lue n\'est écrite sur l\'appareil (ni fichier, ni base, ni sauvegarde système). Tout reste en mémoire et disparaît à la fermeture.\n\n• Les images de la caméra sont analysées en mémoire et jamais enregistrées.\n\nLire une pièce d\'identité traite des données personnelles : recueille le consentement de la personne concernée et n\'utilise l\'application que dans un cadre légitime (RGPD).</string>
+    <string name="privacy_text">Veripuce fonctionne entièrement sur ton téléphone :\n\n• Lecture NFC, scan caméra et vérifications sont exécutés localement, hors connexion.\n\n• Aucune donnée n\'est transmise à un serveur : l\'application ne possède pas la permission Internet — elle est techniquement incapable d\'envoyer quoi que ce soit.\n\n• Rien n\'est conservé : aucune donnée lue n\'est écrite sur l\'appareil (ni fichier, ni base, ni sauvegarde système). Tout reste en mémoire et disparaît à la fermeture.\n\n• Les images de la caméra sont analysées en mémoire et jamais enregistrées.\n\nLire une pièce d\'identité traite des données personnelles : recueille le consentement de la personne concernée et n\'utilise l\'application que dans un cadre légitime (RGPD).</string>
 
     <!-- Aide -->
     <string name="help">Comment scanner ?</string>
@@ -56,4 +59,27 @@
     <string name="chip_integrity_bad">Intégrité ÉCHEC</string>
     <string name="chip_sig_ok">Signature OK</string>
     <string name="chip_sig_unverified">Signature non vérifiée</string>
+
+    <!-- Flux unique : scan MRZ -> détection -> lecture puce -->
+    <string name="scan_prompt">Commence par scanner la bande MRZ, en bas du document (2 lignes pour un passeport, 3 pour une carte).</string>
+    <string name="manual_entry">Saisie manuelle</string>
+    <string name="rescan">Rescanner</string>
+    <string name="doc_passport">Passeport</string>
+    <string name="doc_id_card">Carte d\'identité</string>
+    <string name="doc_residence">Titre de séjour</string>
+    <string name="mrz_valid">MRZ valide</string>
+    <string name="can_needed_note">Le CAN (6 chiffres) est imprimé au **recto** de la carte — il ne figure pas dans la MRZ. Saisis-le ou scanne le recto.</string>
+    <string name="tap_mrz">Approche le document du dos du téléphone, sans bouger.</string>
+    <string name="tap_id">Renseigne le CAN, puis approche la carte du dos du téléphone.</string>
+    <string name="result_fail">Document suspect — une vérification a échoué.</string>
+    <string name="result_unverified">Lu et cohérent — origine non vérifiée (signature CSCA à venir).</string>
+    <string name="scan_first">Scanne d\'abord la MRZ, ou utilise la saisie manuelle.</string>
+    <string name="detected_summary">%1$s · %2$s</string>
+
+    <!-- Nouveaux chips de vérification -->
+    <string name="chip_consistency_ok">MRZ ↔ puce cohérentes</string>
+    <string name="chip_consistency_bad">Incohérence MRZ ↔ puce</string>
+    <string name="chip_clone_ok">Puce authentique</string>
+    <string name="chip_clone_bad">Anti-clone : échec</string>
+    <string name="chip_clone_na">Anti-clone : non disponible</string>
 </resources>

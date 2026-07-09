@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "fr.veridoc.app"
+    namespace = "fr.veripuce.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "fr.veridoc.app"
+        applicationId = "fr.veripuce.app"
         minSdk = 24   // ~97 % du parc ; les AndroidX récentes exigent >= 23
         targetSdk = 36
         // Surchargés en CI par le n° de run (VERSION_CODE) et le tag (VERSION_NAME).
@@ -77,8 +77,8 @@ kotlin {
 }
 
 base {
-    // Nom des artefacts de build : produit veridoc-debug.apk au lieu de app-debug.apk.
-    archivesName.set("veridoc")
+    // Nom des artefacts de build : produit veripuce-debug.apk au lieu de app-debug.apk.
+    archivesName.set("veripuce")
 }
 
 dependencies {

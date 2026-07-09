@@ -34,15 +34,15 @@ jobs:
             echo "::error::Secret KEYSTORE_BASE64 manquant — configurez KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD avant de pousser un tag v*."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/veridoc-release.jks"
-          if [ ! -s "$RUNNER_TEMP/veridoc-release.jks" ]; then
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/veripuce-release.jks"
+          if [ ! -s "$RUNNER_TEMP/veripuce-release.jks" ]; then
             echo "::error::Keystore décodé vide (KEYSTORE_BASE64 invalide ?)."
             exit 1
           fi
 
       - name: Build release signé
         env:
-          KEYSTORE_FILE: ${{ runner.temp }}/veridoc-release.jks
+          KEYSTORE_FILE: ${{ runner.temp }}/veripuce-release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -59,15 +59,15 @@ jobs:
       - name: Vérifier la signature
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -n1)
-          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/veridoc-release.apk
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/veripuce-release.apk
 
       - name: Préparer l'artefact
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/veridoc-release.apk "dist/veridoc-${VERSION}.apk"
+          cp app/build/outputs/apk/release/veripuce-release.apk "dist/veripuce-${VERSION}.apk"
 
       - name: Créer la GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/veridoc-*.apk
+          files: dist/veripuce-*.apk
           generate_release_notes: true

@@ -1,4 +1,4 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,6 +13,9 @@ import kotlin.test.assertNull
  */
 class MrzOcrTest {
 
+    private val P = MrzOcr.DocType.PASSPORT
+    private val ID = MrzOcr.DocType.ID_CARD
+
     // ---------- TD3 (passeport) ----------
 
     @Test
@@ -22,7 +25,7 @@ class MrzOcrTest {
             L898902C36UTO7408122F1204159ZE184226B<<<<<10
         """.trimIndent()
         val mrz = MrzOcr.findMrz(text)
-        assertEquals(MrzOcr.MrzData("L898902C3", "740812", "120415"), mrz)
+        assertEquals(MrzOcr.MrzData("L898902C3", "740812", "120415", P, "UTO"), mrz)
     }
 
     @Test
@@ -30,14 +33,14 @@ class MrzOcrTest {
         // ML Kit découpe fréquemment la ligne MRZ en plusieurs "lignes"/éléments.
         val text = "P<UTOERIKSSON<<ANNA<MARIA<<<<\nL898902C36UTO 7408122F\n1204159ZE184226B<< 10"
         val mrz = MrzOcr.findMrz(text)
-        assertEquals(MrzOcr.MrzData("L898902C3", "740812", "120415"), mrz)
+        assertEquals(MrzOcr.MrzData("L898902C3", "740812", "120415", P, "UTO"), mrz)
     }
 
     @Test
     fun `TD3 - confusions OCR en champ numerique (O pour 0, I pour 1)`() {
         val text = "L898902C36UTO74O8I22F12O4159ZE184226B<<<<<10"
         val mrz = MrzOcr.findMrz(text)
-        assertEquals(MrzOcr.MrzData("L898902C3", "740812", "120415"), mrz)
+        assertEquals(MrzOcr.MrzData("L898902C3", "740812", "120415", P, "UTO"), mrz)
     }
 
     @Test
@@ -45,7 +48,7 @@ class MrzOcrTest {
         // Checks calculés : doc 12AB34567 -> 3, ddn 900112 -> 5, exp 300112 -> 3.
         val text = "12AB345673FRA9001125M3001123<<<<<<<<<<<<<<04"
         val mrz = MrzOcr.findMrz(text)
-        assertEquals(MrzOcr.MrzData("12AB34567", "900112", "300112"), mrz)
+        assertEquals(MrzOcr.MrzData("12AB34567", "900112", "300112", P, "FRA"), mrz)
     }
 
     @Test
@@ -63,22 +66,33 @@ class MrzOcrTest {
 
     // ---------- TD1 (CNIe 2021) ----------
 
+    private val RP = MrzOcr.DocType.RESIDENCE_PERMIT
+
     @Test
-    fun `TD1 - specimen ICAO sur 3 lignes`() {
+    fun `TD1 - carte nationale (code ID) sur 3 lignes`() {
+        // Code document "ID" = carte nationale -> ID_CARD (PACE-CAN).
         val text = """
-            I<UTOD231458907<<<<<<<<<<<<<<<
+            IDUTOD231458907<<<<<<<<<<<<<<<
             7408122F1204159UTO<<<<<<<<<<<6
             ERIKSSON<<ANNA<MARIA<<<<<<<<<<
         """.trimIndent()
         val mrz = MrzOcr.findMrz(text)
-        assertEquals(MrzOcr.MrzData("D23145890", "740812", "120415"), mrz)
+        assertEquals(MrzOcr.MrzData("D23145890", "740812", "120415", ID, "UTO"), mrz)
     }
 
     @Test
     fun `TD1 - fragmentee par ML Kit`() {
-        val text = "I<UTOD231458907<<<<< <<<<<<<<<<\n7408122F 1204159UTO<<<<<<<<<<<6"
+        val text = "IDUTOD231458907<<<<< <<<<<<<<<<\n7408122F 1204159UTO<<<<<<<<<<<6"
         val mrz = MrzOcr.findMrz(text)
-        assertEquals(MrzOcr.MrzData("D23145890", "740812", "120415"), mrz)
+        assertEquals(MrzOcr.MrzData("D23145890", "740812", "120415", ID, "UTO"), mrz)
+    }
+
+    @Test
+    fun `TD1 - titre de sejour (code non ID) est un RESIDENCE_PERMIT`() {
+        // Code document "IR" (titre de séjour) -> clé MRZ, pas de CAN.
+        val text = "IRFRAD231458907<<<<<<<<<<<<<<<\n7408122F1204159FRA<<<<<<<<<<6"
+        val mrz = MrzOcr.findMrz(text)
+        assertEquals(MrzOcr.MrzData("D23145890", "740812", "120415", RP, "FRA"), mrz)
     }
 
     @Test
@@ -86,6 +100,19 @@ class MrzOcrTest {
         // Un doc TD1 valide mais des dates valides trop loin (autre document/frame).
         val filler = "<".repeat(80)
         assertNull(MrzOcr.findMrz("I<UTOD231458907$filler 7408122F1204159UTO<6"))
+    }
+
+    // ---------- Détection du type de document ----------
+
+    @Test
+    fun `type de document - passeport vs carte vs titre de sejour`() {
+        val td3 = MrzOcr.findMrz("L898902C36UTO7408122F1204159ZE184226B<<<<<10")
+        val idCard = MrzOcr.findMrz("IDFRAD231458907<<<<<<<<<<<<<<<\n7408122F1204159FRA<<<<<<<<<<6")
+        val permit = MrzOcr.findMrz("IRFRAD231458907<<<<<<<<<<<<<<<\n7408122F1204159FRA<<<<<<<<<<6")
+        assertEquals(P, td3?.docType)
+        assertEquals(ID, idCard?.docType)
+        assertEquals(RP, permit?.docType)
+        assertEquals("FRA", idCard?.issuingState)
     }
 
     // ---------- Bruit / faux positifs ----------

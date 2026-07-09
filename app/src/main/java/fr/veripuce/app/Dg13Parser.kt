@@ -1,4 +1,4 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 /**
  * Parser best-effort du DG13 de la CNI française.

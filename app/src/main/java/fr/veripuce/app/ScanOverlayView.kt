@@ -1,4 +1,4 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 import android.content.Context
 import android.graphics.Canvas

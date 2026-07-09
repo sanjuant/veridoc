@@ -1,4 +1,4 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 /**
  * Clé d'accès à la puce eMRTD (ICAO 9303).

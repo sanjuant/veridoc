@@ -1,4 +1,4 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 /**
  * Extraction OCR des clés d'accès depuis le texte reconnu par ML Kit.
@@ -20,10 +20,20 @@ package fr.veridoc.app
  */
 object MrzOcr {
 
+    /**
+     * Type de document déduit de la MRZ.
+     *  - [PASSPORT] : TD3 (2 lignes) -> clé MRZ.
+     *  - [ID_CARD] : TD1, code document « ID » (carte nationale, ex. CNIe) -> PACE-CAN.
+     *  - [RESIDENCE_PERMIT] : TD1, autre code (titre de séjour) -> clé MRZ, comme un passeport.
+     */
+    enum class DocType { ID_CARD, PASSPORT, RESIDENCE_PERMIT }
+
     data class MrzData(
         val documentNumber: String,
         val dateOfBirth: String,   // AAMMJJ
         val dateOfExpiry: String,  // AAMMJJ
+        val docType: DocType,
+        val issuingState: String,  // code pays 3 lettres (ex. "FRA")
     )
 
     // Classes tolérantes aux confusions OCR en position numérique (re-normalisées par
@@ -34,9 +44,10 @@ object MrzOcr {
     // Non ancré : recherché n'importe où dans le texte joint.
     private val TD3_SEQ = Regex("([A-Z0-9<]{9})($D)([A-Z<]{3})($D{6})($D)([MF<XK])($D{6})($D)")
 
-    // TD1 (CNIe 2021) : « ligne 1 » = code doc(2) état(3) doc(9) ck ; « ligne 2 » =
-    // ddn(6) ck sexe exp(6) ck. Appariés par fenêtre de proximité dans le texte joint.
-    private val TD1_DOC = Regex("[ACI][A-Z<][A-Z<]{3}([A-Z0-9<]{9})($D)")
+    // TD1 (CNIe / titre de séjour) : « ligne 1 » = code doc(2) état(3) doc(9) ck ;
+    // « ligne 2 » = ddn(6) ck sexe exp(6) ck. Appariés par fenêtre de proximité.
+    // Le code document (« ID » = carte nationale, autre = titre de séjour…) est capturé.
+    private val TD1_DOC = Regex("([ACI][A-Z<])([A-Z<]{3})([A-Z0-9<]{9})($D)")
     private val TD1_DATES = Regex("($D{6})($D)([MF<XK])($D{6})($D)")
 
     private val CAN_6_DIGITS = Regex("(?<![0-9A-Z])[0-9]{6}(?![0-9A-Z])")
@@ -57,7 +68,9 @@ object MrzOcr {
         // non chevauchant : un faux départ dans les '<' de la ligne 1 consommerait le
         // début de la vraie séquence et la ferait rater.
 
-        // TD3/TD2 : séquence complète doc..exp, où qu'elle soit.
+        // TD3/TD2 (passeport) : séquence complète doc..exp, où qu'elle soit. L'état
+        // émetteur n'est pas sur cette ligne -> on prend la nationalité (group 3), qui
+        // coïncide pour un passeport ; sert seulement à l'affichage/détection.
         for (i in joined.indices) {
             val m = TD3_SEQ.matchAt(joined, i) ?: continue
             val doc = m.groupValues[1]
@@ -66,17 +79,19 @@ object MrzOcr {
             if (checkOk(doc, m.groupValues[2]) && checkOk(dob, m.groupValues[5]) && checkOk(exp, m.groupValues[8]) &&
                 plausibleDate(dob) && plausibleDate(exp)
             ) {
-                return MrzData(doc.trimEnd('<'), dob, exp)
+                return MrzData(doc.trimEnd('<'), dob, exp, DocType.PASSPORT, m.groupValues[3].trimEnd('<'))
             }
         }
 
-        // TD1 : doc et dates viennent de segments distincts -> exiger que les dates
-        // suivent le doc à distance plausible (ligne 1 = 30 chars, doc en position 5 :
-        // les dates démarrent ~25 chars après le doc ; fenêtre large pour le bruit OCR).
+        // TD1 (carte d'identité) : doc et dates viennent de segments distincts -> exiger
+        // que les dates suivent le doc à distance plausible (ligne 1 = 30 chars, doc en
+        // position 5 ; fenêtre large pour le bruit OCR). L'état émetteur est sur la ligne 1.
         for (i in joined.indices) {
             val m1 = TD1_DOC.matchAt(joined, i) ?: continue
-            val doc = m1.groupValues[1]
-            if (!checkOk(doc, m1.groupValues[2])) continue
+            val docCode = m1.groupValues[1].replace("<", "")
+            val state = m1.groupValues[2].trimEnd('<')
+            val doc = m1.groupValues[3]
+            if (!checkOk(doc, m1.groupValues[4])) continue
             val windowEnd = minOf(joined.length, m1.range.last + 46)
             for (j in (m1.range.last + 1) until windowEnd) {
                 val m2 = TD1_DATES.matchAt(joined, j) ?: continue
@@ -85,7 +100,11 @@ object MrzOcr {
                 if (checkOk(dob, m2.groupValues[2]) && checkOk(exp, m2.groupValues[5]) &&
                     plausibleDate(dob) && plausibleDate(exp)
                 ) {
-                    return MrzData(doc.trimEnd('<'), dob, exp)
+                    // Code « ID » = carte nationale (PACE-CAN) ; sinon titre de séjour
+                    // (clé MRZ, comme un passeport). En cas de doute, l'échec d'ouverture
+                    // MRZ révèle le champ CAN côté UI (filet de sécurité).
+                    val type = if (docCode == "ID") DocType.ID_CARD else DocType.RESIDENCE_PERMIT
+                    return MrzData(doc.trimEnd('<'), dob, exp, type, state)
                 }
             }
         }

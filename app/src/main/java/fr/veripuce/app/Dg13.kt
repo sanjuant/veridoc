@@ -1,4 +1,4 @@
-package fr.veridoc.app
+package fr.veripuce.app
 
 /**
  * Données extraites du DG13 de la CNI française (spécifique France, non standard ICAO).

@@ -1,73 +1,83 @@
-# Véridoc
+# Veripuce
 
-**Lecture et vérification NFC de documents d'identité — CNIe française & passeports biométriques (ICAO 9303).**
+**Lecture et vérification NFC de documents d'identité — CNIe française, passeports biométriques et titres de séjour (ICAO 9303).**
 
-[![Build APK](https://github.com/sanjuant/veridoc/actions/workflows/build-apk.yml/badge.svg)](https://github.com/sanjuant/veridoc/actions/workflows/build-apk.yml)
-[![Release](https://img.shields.io/github/v/release/sanjuant/veridoc)](https://github.com/sanjuant/veridoc/releases/latest)
+[![Build APK](https://github.com/sanjuant/veripuce/actions/workflows/build-apk.yml/badge.svg)](https://github.com/sanjuant/veripuce/actions/workflows/build-apk.yml)
+[![Release](https://img.shields.io/github/v/release/sanjuant/veripuce)](https://github.com/sanjuant/veripuce/releases/latest)
 ![Platform](https://img.shields.io/badge/plateforme-Android%2024%2B-3DDC84?logo=android&logoColor=white)
 ![minSdk](https://img.shields.io/badge/minSdk-24-blue)
 ![targetSdk](https://img.shields.io/badge/targetSdk-36-blue)
 
-Véridoc lit la puce NFC d'une **carte nationale d'identité électronique** (format 2021) ou d'un
+Veripuce lit la puce NFC d'une **carte nationale d'identité électronique** (format 2021) ou d'un
 **passeport biométrique**, affiche l'état civil et la photo stockés dans la puce, et vérifie
 **cryptographiquement** que les données n'ont pas été altérées (*passive authentication*).
 Aucun matériel externe : le téléphone sert de lecteur.
 
-| Mode carte d'identité | Mode passeport | Scan OCR (viseur) | Résultat de lecture |
-|:---:|:---:|:---:|:---:|
-| ![Mode carte d'identité](docs/screen-id.png) | ![Mode passeport](docs/screen-passport.png) | ![Scan OCR de la MRZ](docs/screen-scan.png) | ![Résultat de lecture](docs/screen-result.png) |
+| Écran principal | Scan OCR (viseur) | Résultat vérifié |
+|:---:|:---:|:---:|
+| ![Écran principal](docs/screen-main.png) | ![Scan OCR de la MRZ](docs/screen-scan.png) | ![Résultat vérifié](docs/screen-result.png) |
 
 *Captures d'écran avec des données fictives (spécimen ICAO 9303 et identité factice).*
 
 ## Fonctionnalités
 
-- **Deux modes de lecture** — CNIe via **PACE-CAN** (les 6 chiffres du recto), passeport via
-  **PACE-MRZ** avec repli **BAC** pour les documents anciens.
-- **Scan OCR intégré** — le CAN ou la bande MRZ peuvent être scannés à la caméra
-  (CameraX + ML Kit, **100 % hors-ligne, on-device**) ; la lecture MRZ n'est acceptée que si
-  les **chiffres de contrôle ICAO** sont valides. La saisie manuelle reste toujours possible.
-- **Vérification d'intégrité** — les empreintes des groupes de données lus (DG1, DG2, DG13)
-  sont recalculées sur les **octets bruts de la puce** et comparées aux empreintes **signées**
-  du SOD (Document Security Object).
-- **Données France (DG13)** — adresse, taille et lieu de naissance, spécifiques à la CNIe,
-  décodés par un parseur BER-TLV dédié (encodage Latin-1 géré).
-- **Photo de la puce** — décodage JPEG 2000 (et JPEG/PNG), formats **ISO 19794** et
-  **ISO 39794** (passeports récents).
-- **Interface Material 3** — thème clair/sombre, icône adaptative + monochrome (Android 13+),
-  affichage bord-à-bord (Android 15+).
+- **Un seul geste : scanner la MRZ.** La bande MRZ (bas du document) est scannée à la caméra ;
+  Veripuce en **déduit le type de document** — passeport, carte d'identité ou **titre de séjour** —
+  d'après le code MRZ, et pré-remplit tout après validation des **chiffres de contrôle ICAO**.
+- **Ouverture de la puce** — passeport et **titre de séjour** : clé **PACE-MRZ** (repli **BAC**)
+  directement issue du scan, sans rien saisir. CNIe : **PACE-CAN** — le CAN (6 chiffres) est au
+  *recto*, il ne figure pas dans la MRZ, donc il reste demandé (saisi ou scanné).
+- **Repli robuste** — si la caméra est absente/cassée ou la lumière insuffisante : **lampe torche**
+  intégrée, **saisie manuelle** (n° document + dates, ou CAN) toujours disponible, et bascule
+  automatique vers la saisie si la caméra échoue.
+- **Cohérence document ↔ puce** — la MRZ imprimée (scan optique) est comparée à la MRZ de la
+  puce (DG1) : détecte un document dont la photo/impression ne correspond pas au contenu de la puce.
+- **Détection de puce clonée** — **Chip Authentication** (la puce prouve qu'elle détient une clé
+  privée non extractible ; repli **Active Authentication**). Une puce clonée — qui a copié les
+  données mais pas la clé — échoue.
+- **Vérification d'intégrité** — empreintes des data groups (DG1, DG2, DG13, DG14, DG15) recalculées
+  sur les **octets bruts** et comparées aux empreintes **signées** du SOD.
+- **100 % on-device, sans réseau** — lecture, OCR et vérifications locales ; l'app n'a pas la
+  permission Internet (voir Confidentialité). Données France (DG13), photo ISO 19794 / 39794.
 
 ## Comment ça marche
 
-Un eMRTD (ICAO 9303) exige l'établissement d'un canal sécurisé avant toute lecture. Seule la
-**clé d'accès** diffère selon le document ; la lecture est ensuite identique :
+```
+      Scan MRZ (caméra, on-device)
+            │  détection type + chiffres de contrôle ICAO
+            ▼
+   ┌── Passeport ──► clé PACE-MRZ ─┐
+   │                               ├─► approcher la puce (NFC)
+   └── Carte (CNIe) ─► + CAN recto ┘
+                                    │
+   IsoDep ─► CardService (SCUBA) ─► PassportService (JMRTD)
+                                    ├── DG1 (MRZ) · DG2 (photo) · DG13 (France)
+                                    ├── EF.SOD ──► intégrité (empreintes signées)
+                                    ├── DG1 puce == MRZ scannée ? (cohérence)
+                                    └── DG14/DG15 ──► anti-clone (Chip/Active Auth.)
+```
 
 | Document | Ouverture de session | Clé d'accès |
 |---|---|---|
-| CNIe (France, 2021+) | PACE | **CAN** — 6 chiffres imprimés au recto |
-| Passeport récent | PACE | Clé dérivée de la **MRZ** (n° document + naissance + expiration) |
-| Passeport ancien | BAC | Clé dérivée de la **MRZ** |
-
-```
-IsoDep (NFC) ──► CardService (SCUBA) ──► PassportService (JMRTD)
-                       │
-                       ├── PACE-CAN / PACE-MRZ / BAC          (session sécurisée)
-                       ├── DG1 (MRZ) · DG2 (photo) · DG13 (France)
-                       └── EF.SOD ──► vérification des empreintes signées
-```
+| CNIe (France, 2021+) | PACE | **CAN** — 6 chiffres imprimés au recto (hors MRZ) |
+| Titre de séjour | PACE / BAC | Clé dérivée de la **MRZ** (scannée) |
+| Passeport récent | PACE | Clé dérivée de la **MRZ** (scannée) |
+| Passeport ancien | BAC | Clé dérivée de la **MRZ** (scannée) |
 
 ### Modèle de sécurité
 
-La *passive authentication* (ICAO 9303 partie 11) comporte trois étapes :
+Quatre vérifications indépendantes, reflétées par les chips de l'écran de résultat :
 
-| # | Étape | Ce que ça prouve | Statut |
-|---|---|---|---|
-| 1 | Lecture de l'**EF.SOD** | — | ✅ |
-| 2 | Empreintes recalculées = empreintes **signées** du SOD | Données **non altérées** | ✅ |
-| 3 | Signature du SOD chaînée jusqu'à une **CSCA de confiance** (ANTS / ICAO PKD) | Document **émis par l'État** | 🚧 roadmap |
+| Vérification | Ce que ça prouve | Statut |
+|---|---|---|
+| **Intégrité** (empreintes = SOD signé) | Données de la puce **non altérées** | ✅ |
+| **Cohérence MRZ ↔ puce** | Le document imprimé correspond à la puce | ✅ |
+| **Anti-clone** (Chip / Active Authentication) | La puce n'est **pas un clone** | ✅ |
+| **Signature CSCA** (chaîne DSC → ANTS / ICAO PKD) | Document **émis par l'État** | 🚧 roadmap |
 
-En complément, la *Chip Authentication* (détection de puce **clonée**) est envisagée en roadmap.
-Les chips d'état de l'interface reflètent honnêtement cette couverture : « Intégrité OK » et
-« Signature non vérifiée » tant que le magasin CSCA n'est pas embarqué.
+> La détection de clone repose surtout sur la **Chip Authentication** ; l'Active Authentication
+> (repli) est vérifiée pour les clés EC. La signature CSCA (origine étatique) reste à brancher.
+> Toutes ces vérifications demandent une **validation sur documents réels** (non testable sans puce).
 
 ### Limites structurelles
 
@@ -81,17 +91,17 @@ Les chips d'état de l'interface reflètent honnêtement cette couverture : « I
 
 ### Depuis les releases
 
-Télécharger le dernier APK signé : **[Releases](https://github.com/sanjuant/veridoc/releases/latest)**
-(`veridoc-x.y.z.apk`), puis l'installer (autoriser les sources inconnues si nécessaire).
+Télécharger le dernier APK signé : **[Releases](https://github.com/sanjuant/veripuce/releases/latest)**
+(`veripuce-x.y.z.apk`), puis l'installer (autoriser les sources inconnues si nécessaire).
 
 Prérequis : Android 7.0+ (API 24) avec NFC. La caméra est optionnelle (scan OCR).
 
 ### Compilation locale
 
 ```bash
-git clone https://github.com/sanjuant/veridoc.git
-cd veridoc
-./gradlew assembleDebug          # APK : app/build/outputs/apk/debug/veridoc-debug.apk
+git clone https://github.com/sanjuant/veripuce.git
+cd veripuce
+./gradlew assembleDebug          # APK : app/build/outputs/apk/debug/veripuce-debug.apk
 ```
 
 Prérequis : JDK 17, Android SDK (compileSdk 36). Le wrapper Gradle est fourni (8.14.3 épinglé).
@@ -100,8 +110,8 @@ Prérequis : JDK 17, Android SDK (compileSdk 36). Le wrapper Gradle est fourni (
 
 | Déclencheur | Workflow | Sortie |
 |---|---|---|
-| push sur une branche | `build-apk.yml` | artefact **veridoc-debug-apk** |
-| tag `v*` (ex. `v1.0.0`) | `release.yml` | **GitHub Release** avec APK **signé** `veridoc-x.y.z.apk` |
+| push sur une branche | `build-apk.yml` | artefact **veripuce-debug-apk** |
+| tag `v*` (ex. `v1.0.0`) | `release.yml` | **GitHub Release** avec APK **signé** `veripuce-x.y.z.apk` |
 
 La clé de signature n'est jamais dans le dépôt : elle est injectée par secrets GitHub
 (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`). Le `versionCode` est
@@ -131,7 +141,7 @@ Chaîne de build : **AGP 8.13.2 · Kotlin 2.3.21 · Gradle 8.14.3 · JDK 17 · c
 - **Passive authentication sur octets bruts** — les empreintes du SOD sont calculées par
   l'émetteur sur les octets *tels que stockés* ; hacher une re-sérialisation JMRTD
   (`DGxFile.encoded`) peut diverger octet à octet et invalider un document authentique.
-  Véridoc lit chaque DG une fois en brut et parse depuis ces mêmes octets.
+  Veripuce lit chaque DG une fois en brut et parse depuis ces mêmes octets.
 - **Pas de `javax.imageio` sur Android** — la photo (souvent JPEG 2000) est décodée par
   JP2ForAndroid ; la coordonnée d'origine `com.gemalto.jp2:jp2-android` n'étant plus
   résolvable, le projet utilise son miroir Maven Central (même package, mêmes libs natives).
@@ -147,25 +157,27 @@ Chaîne de build : **AGP 8.13.2 · Kotlin 2.3.21 · Gradle 8.14.3 · JDK 17 · c
 ```
 app/src/main/
 ├── AndroidManifest.xml
-├── java/fr/veridoc/app/
-│   ├── MainActivity.kt      # UI, sélecteur de mode, dispatch NFC, lancement lecture
-│   ├── ScanActivity.kt      # scan OCR (CameraX + ML Kit, on-device)
-│   ├── MrzOcr.kt            # parseur MRZ TD1/TD2/TD3 + CAN, chiffres de contrôle ICAO
+├── java/fr/veripuce/app/
+│   ├── MainActivity.kt      # flux unique (scan MRZ -> détection -> puce), résultat
+│   ├── ScanActivity.kt      # scan OCR + viseur (CameraX + ML Kit, on-device)
+│   ├── ScanOverlayView.kt   # viseur de cadrage (MRZ / carte)
+│   ├── MrzOcr.kt            # parseur MRZ TD1/TD2/TD3 + CAN, type de doc, checks ICAO
 │   ├── AccessKey.kt         # clé d'accès : Can (CNIe) / Mrz (passeport)
-│   ├── CnieReader.kt        # PACE/BAC, lecture DG1/DG2/DG13, passive authentication
-│   ├── ReadResult.kt        # résultat structuré
+│   ├── CnieReader.kt        # PACE/BAC, lecture DGx, intégrité, cohérence, anti-clone
+│   ├── ReadResult.kt        # résultat structuré (dont CloneCheck)
 │   └── BerTlv.kt, Dg13*.kt  # parseur BER-TLV + DG13 (spécifique France)
+├── test/java/fr/veripuce/app/MrzOcrTest.kt   # 15 tests (spécimens ICAO, fragmentation…)
 └── res/                     # Material 3 : layouts, thèmes clair/sombre, icônes adaptatives
 ```
 
 ## Confidentialité
 
-Véridoc est conçu **local-first**, et cette garantie est **vérifiable techniquement** :
+Veripuce est conçu **local-first**, et cette garantie est **vérifiable techniquement** :
 
 - **Aucune permission Internet.** Les permissions `INTERNET` et `ACCESS_NETWORK_STATE`
   (injectées par les bibliothèques ML Kit/GMS) sont explicitement **retirées** du manifeste
   (`tools:node="remove"`) : l'application est *incapable* de transmettre une donnée.
-  Vérifiable sur l'APK : `aapt2 dump permissions veridoc.apk` → NFC et CAMERA uniquement.
+  Vérifiable sur l'APK : `aapt2 dump permissions veripuce.apk` → NFC et CAMERA uniquement.
 - **Aucun stockage.** Les données lues (état civil, photo, adresse) ne sont écrites nulle
   part — ni fichier, ni base, ni préférences ; `allowBackup=false`. Tout reste en mémoire
   et disparaît à la fermeture.
@@ -185,10 +197,13 @@ Un bandeau « 100 % local » dans l'application ouvre le détail de ces garantie
 
 ## Roadmap
 
-- [ ] **Passive authentication complète** : vérification de la signature du SOD et chaîne
-      DSC → CSCA (magasin ANTS / ICAO PKD embarqué)
-- [ ] **Chip Authentication** (détection de clone)
+- [ ] **Signature CSCA** : signature du SOD et chaîne DSC → CSCA de confiance
+      (magasin ANTS / ICAO PKD embarqué) — origine étatique
+- [ ] Validation de l'anti-clone (Active Authentication RSA) sur documents réels
 - [ ] Migration AGP 9.x / API 37 quand l'écosystème AndroidX l'exigera
-- [x] Scan OCR du CAN et de la MRZ (on-device)
+- [x] Flux unique : scan MRZ → détection du type de document → lecture puce
+- [x] Cohérence MRZ optique ↔ puce (DG1)
+- [x] Détection de puce clonée (Chip / Active Authentication)
+- [x] Scan OCR du CAN et de la MRZ (on-device) + viseur de cadrage
 - [x] Support passeport (PACE-MRZ / BAC) et CNIe (PACE-CAN)
 - [x] Release signée automatisée (tag → GitHub Release)
