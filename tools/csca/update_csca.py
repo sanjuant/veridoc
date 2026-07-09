@@ -29,7 +29,6 @@ Garde-fous :
   - Les certificats de TEST de l'ANTS ne sont jamais inclus.
 """
 import collections
-import datetime
 import hashlib
 import io
 import re
@@ -181,11 +180,21 @@ def main():
             sys.exit(f"ERREUR: {name} absent des masterlists ICAO et BSI — canal ANTS suspect, dépôt refusé")
 
     print("== 4/4 Dédup, validation stricte, écriture (1 fichier PEM par certificat) ==")
-    today = datetime.date.today().isoformat()
+    # Sortie volontairement SANS date : mêmes sources -> fichiers octet-pour-octet
+    # identiques -> pas de faux diff en CI. La date de dépôt d'un certificat se lit
+    # dans l'historique git de son fichier ; l'édition des sources est dans les
+    # en-têtes (le nom des masterlists change à chaque réédition).
     icao_name = m.group(0).split("/")[-1]
+    # Éditions exactes : MANIFEST.tsv uniquement. Les en-têtes des fichiers individuels
+    # utilisent des références STABLES, sinon chaque réédition de masterlist modifierait
+    # l'en-tête des ~700 fichiers sans qu'aucun certificat ne change.
     source_detail = {
         "icao": f"masterlist ICAO {icao_name} ({ICAO_BASE}{m.group(0)})",
         "bsi": f"masterlist BSI {bsi_name} ({BSI_ZIP})",
+    }
+    stable_detail = {
+        "icao": "masterlist ICAO (https://www.icao.int/icao-pkd/icao-master-list — édition : MANIFEST.tsv)",
+        "bsi": f"masterlist BSI ({BSI_ZIP} — édition : MANIFEST.tsv)",
     }
     ants_by_hash = {hashlib.sha256(der).hexdigest(): name for name, der in ants_ders.items()}
 
@@ -218,7 +227,7 @@ def main():
 
     kept.sort(key=lambda t: (t[0], cn_of(t[1].subject), t[1].not_valid_before_utc, t[2]))
     manifest = [
-        f"# Magasin CSCA — généré le {today} par tools/csca/update_csca.py",
+        "# Magasin CSCA — généré par tools/csca/update_csca.py",
         f"# Éditions : {source_detail['icao']}",
         f"#            {source_detail['bsi']}",
         f"#            ANTS : {', '.join(f'{n} ({u})' for n, u in ANTS.items())}",
@@ -230,7 +239,7 @@ def main():
         if fname.lower() in used_names:  # collision de préfixe SHA (improbable) -> empreinte longue
             fname = fname.replace(f"_{h[:8]}.pem", f"_{h[:16]}.pem")
         used_names.add(fname.lower())
-        detail = [source_detail.get(s) or f"ANTS {ants_by_hash[h]} ({ANTS[ants_by_hash[h]]})" for s in sources]
+        detail = [stable_detail.get(s) or f"ANTS {ants_by_hash[h]} ({ANTS[ants_by_hash[h]]})" for s in sources]
         header = (
             f"# Certificat CSCA — ancre de confiance passive authentication (ICAO 9303-11)\n"
             f"# Sujet      : {cert.subject.rfc4514_string()}\n"
@@ -239,7 +248,7 @@ def main():
             f"# Validité   : {cert.not_valid_before_utc:%Y-%m-%d} -> {cert.not_valid_after_utc:%Y-%m-%d}\n"
             f"# SHA-256    : {h}\n"
             + "".join(f"# Source     : {d}\n" for d in detail)
-            + f"# Téléchargé : {today} (voir MANIFEST.tsv et README.txt)\n"
+            + "# Date de dépôt : voir l'historique git de ce fichier ; détails : MANIFEST.tsv, README.txt\n"
         )
         (OUT_DIR / fname).write_bytes(header.encode() + cert.public_bytes(Encoding.PEM))
         manifest.append(
@@ -251,7 +260,7 @@ def main():
     print(f"\n{OUT_DIR}")
     print(f"{len(kept)} certificats uniques ({bad} illisibles écartés), FR={countries['FR']}, "
           f"{len(list(OUT_DIR.glob('*.pem')))} fichiers .pem + MANIFEST.tsv")
-    print("Pensez à mettre à jour la date et les éditions dans assets/csca/README.txt,")
+    print("Contrôlez le diff (git status / diff du MANIFEST.tsv),")
     print("puis lancez les tests : ./gradlew testDebugUnitTest")
 
 

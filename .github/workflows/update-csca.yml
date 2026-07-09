@@ -1,0 +1,137 @@
+name: Mise à jour CSCA
+
+# Rafraîchit le magasin de confiance CSCA (assets/csca/) depuis les sources officielles
+# (masterlists ICAO + BSI, certificats ANTS) et ouvre une PR si le magasin a changé.
+# Les masterlists sont rééditées tous les 1 à 3 mois ; un passage hebdomadaire suffit.
+#
+# La PR n'est JAMAIS fusionnée automatiquement : le diff (un fichier PEM par certificat
+# + MANIFEST.tsv) est relu par un humain — c'est le point de contrôle de l'ancre de
+# confiance de toute la passive authentication.
+#
+# Prérequis côté dépôt : Settings > Actions > General >
+# « Allow GitHub Actions to create and approve pull requests ».
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'   # tous les lundis à 05:17 UTC
+  workflow_dispatch:        # lancement manuel depuis l'onglet Actions
+
+permissions:
+  contents: write        # pousser la branche de mise à jour
+  pull-requests: write   # ouvrir la PR
+
+jobs:
+  update-csca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Dépendances Python
+        run: pip install cryptography requests
+
+      - name: Compter le magasin actuel
+        id: before
+        run: echo "count=$(ls app/src/main/assets/csca/*.pem | wc -l)" >> "$GITHUB_OUTPUT"
+
+      # Le script vérifie les signatures CMS des masterlists, recoupe les CSCA françaises
+      # entre canaux indépendants et refuse le dépôt si le recoupement échoue (exit != 0
+      # -> le job échoue -> notification par e-mail au propriétaire du dépôt).
+      - name: Régénérer le magasin CSCA
+        run: python tools/csca/update_csca.py
+
+      # Une masterlist tronquée ou une purge massive doit passer par une revue manuelle,
+      # pas par une PR d'apparence anodine.
+      - name: Garde anti-rétrécissement (> 10 % de perte = échec)
+        run: |
+          before='${{ steps.before.outputs.count }}'
+          after=$(ls app/src/main/assets/csca/*.pem | wc -l)
+          echo "certificats avant: $before — après: $after"
+          if [ "$after" -lt $(( before * 90 / 100 )) ]; then
+            echo "::error::Le magasin passerait de $before à $after certificats — vérification manuelle requise."
+            exit 1
+          fi
+
+      - name: Détecter un changement
+        id: diff
+        run: |
+          if [ -n "$(git status --porcelain -- app/src/main/assets/csca)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Magasin inchangé — rien à faire."
+          fi
+
+      # Les tests d'audit (CscaBundleTest) doivent passer AVANT d'ouvrir la PR :
+      # 1 fichier = 1 certificat, empreinte du nom conforme au contenu, manifest cohérent,
+      # CSCA françaises présentes. (build-apk.yml ne lance pas les tests unitaires.)
+      - name: JDK 17
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: SDK Android
+        if: steps.diff.outputs.changed == 'true'
+        uses: android-actions/setup-android@v4
+
+      - name: Gradle cache
+        if: steps.diff.outputs.changed == 'true'
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Tests unitaires (dont audit du magasin)
+        if: steps.diff.outputs.changed == 'true'
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Préparer le descriptif de la PR
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          body="$RUNNER_TEMP/pr-body.md"
+          after=$(ls app/src/main/assets/csca/*.pem | wc -l)
+          {
+            echo "Mise à jour automatique du magasin de confiance CSCA depuis les sources officielles."
+            echo
+            echo "**Certificats : ${{ steps.before.outputs.count }} → $after**"
+            echo
+            echo "Éditions téléchargées (en-tête du MANIFEST) :"
+            echo '```'
+            grep '^#' app/src/main/assets/csca/MANIFEST.tsv
+            echo '```'
+            echo
+            echo "### Certificats entrants / sortants"
+            echo '```'
+            git status --porcelain -- app/src/main/assets/csca | grep -v 'MANIFEST.tsv' | head -100
+            n=$(git status --porcelain -- app/src/main/assets/csca | grep -v 'MANIFEST.tsv' | wc -l)
+            [ "$n" -gt 100 ] && echo "… ($n changements au total)"
+            echo '```'
+            echo "(?? = entrant, D = sortant — le détail de chaque certificat est dans son fichier .pem et dans le diff du MANIFEST.tsv)"
+            echo
+            echo "### Revue attendue"
+            echo "- [ ] Le volume de changements est plausible (rééditions de masterlists, pas de purge massive)"
+            echo "- [ ] Les CSCA françaises sont toujours présentes (\`FR_*\` dans MANIFEST.tsv)"
+            echo "- [ ] Les tests unitaires de ce run sont verts (audit du magasin inclus)"
+            echo
+            echo "Contrôles déjà effectués par le job : signatures CMS des masterlists vérifiées,"
+            echo "CSCA françaises recoupées entre canaux indépendants, garde anti-rétrécissement,"
+            echo "tests \`CscaBundleTest\` passés."
+          } > "$body"
+          cat "$body"
+
+      - name: Ouvrir ou mettre à jour la PR
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: csca/update
+          delete-branch: true
+          add-paths: app/src/main/assets/csca
+          commit-message: |
+            Mise à jour du magasin CSCA (masterlists ICAO/BSI + ANTS)
+
+            Généré par .github/workflows/update-csca.yml via tools/csca/update_csca.py.
+          title: 'Mise à jour du magasin CSCA'
+          body-path: ${{ runner.temp }}/pr-body.md

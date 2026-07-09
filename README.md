@@ -81,18 +81,20 @@ Quatre vérifications indépendantes, reflétées par les chips de l'écran de r
 
 ### Magasin de confiance CSCA embarqué
 
-L'app embarque **773 certificats CSCA** (`assets/csca/`, **un fichier PEM par certificat** pour
-l'auditabilité), union dédupliquée de trois sources officielles indépendantes : la **masterlist
-ICAO**, la **masterlist BSI** (Allemagne) et les certificats **ANTS** (CSCA-FRANCE 2010→2025 +
-**eID-FRANCE** pour la CNIe, absente des masterlists « voyage »). Chaque fichier est nommé
+L'app embarque les certificats CSCA du monde entier (~770 au dépôt initial — l'état courant est
+dans `assets/csca/MANIFEST.tsv`), **un fichier PEM par certificat** pour l'auditabilité : union
+dédupliquée de trois sources officielles indépendantes — la **masterlist ICAO**, la **masterlist
+BSI** (Allemagne) et les certificats **ANTS** (CSCA-FRANCE 2010→2025 + **eID-FRANCE** pour la
+CNIe, absente des masterlists « voyage »). Chaque fichier est nommé
 `<pays>_<CN>_<sources>_<sha256>.pem` et porte en tête sa provenance exacte (édition de
 masterlist / URL, validité, empreinte) ; `MANIFEST.tsv` récapitule le magasin et rend chaque
-mise à jour diffable. Les CSCA françaises ont été **recoupées octet-pour-octet** entre les
-canaux au moment du dépôt. La signature du SOD est vérifiée (CMS), puis le certificat signataire
+mise à jour diffable. Les CSCA françaises sont **recoupées octet-pour-octet** entre les canaux
+à chaque génération. La signature du SOD est vérifiée (CMS), puis le certificat signataire
 (DSC) est chaîné jusqu'à une de ces CSCA : verdict **vert uniquement si l'origine étatique est
 prouvée** ; une signature valide sans chaîne connue reste neutre, une signature invalide est une
-anomalie dure. Mise à jour du magasin : `python tools/csca/update_csca.py` (les masterlists sont
-rééditées tous les 1 à 3 mois).
+anomalie dure. Le magasin est rafraîchi par une **action planifiée hebdomadaire**
+(`update-csca.yml`) qui ouvre une PR à relire quand les masterlists changent — jamais de fusion
+automatique ; en local : `python tools/csca/update_csca.py`.
 
 ### Limites structurelles
 
@@ -213,9 +215,9 @@ Un bandeau « 100 % local » dans l'application ouvre le détail de ces garantie
 
 ## Roadmap
 
-- [ ] Rafraîchissement périodique du magasin CSCA (les masterlists sont rééditées
-      tous les 1 à 3 mois) — envisager une action CI planifiée
 - [ ] Validation de l'anti-clone (Active Authentication RSA) sur documents réels
+- [x] Rafraîchissement périodique du magasin CSCA : action planifiée hebdomadaire
+      (`update-csca.yml`) qui régénère le magasin et ouvre une PR à relire
 - [x] **Signature CSCA** : signature du SOD et chaîne DSC → CSCA de confiance
       (magasin ICAO + BSI + ANTS embarqué, 773 certs) — origine étatique
 - [ ] Migration AGP 9.x / API 37 quand l'écosystème AndroidX l'exigera
