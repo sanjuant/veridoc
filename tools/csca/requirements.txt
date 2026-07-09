@@ -1,0 +1,8 @@
+# Versions ÉPINGLÉES : la génération du magasin CSCA doit être reproductible.
+# cryptography >= 43 rejette en dur des CSCA légitimes présentes dans les masterlists
+# signées (sérials DER négatifs — Japon —, paramètres NULL sur ECDSA : AT/DE/AE/JP) ;
+# la première exécution CI non épinglée a perdu 7 certificats (PR du 2026-07-09).
+# Le repli openssl de update_csca.py les garde désormais, mais l'épinglage évite
+# toute dérive de métadonnées entre environnements.
+cryptography==42.0.8
+requests==2.32.3

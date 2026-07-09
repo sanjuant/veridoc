@@ -31,18 +31,39 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Dépendances Python
-        run: pip install cryptography requests
+      # Versions ÉPINGLÉES : cryptography >= 43 rejette des CSCA légitimes (sérials DER
+      # négatifs, paramètres NULL ECDSA) — une install non épinglée a produit une PR
+      # supprimant 7 certificats à sources inchangées.
+      - name: Dépendances Python (épinglées)
+        run: |
+          pip install -r tools/csca/requirements.txt
+          python -c "import cryptography; print('cryptography', cryptography.__version__)"
 
       - name: Compter le magasin actuel
         id: before
-        run: echo "count=$(ls app/src/main/assets/csca/*.pem | wc -l)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "count=$(ls app/src/main/assets/csca/*.pem | wc -l)" >> "$GITHUB_OUTPUT"
+          grep '^#' app/src/main/assets/csca/MANIFEST.tsv > "$RUNNER_TEMP/editions-avant.txt"
 
       # Le script vérifie les signatures CMS des masterlists, recoupe les CSCA françaises
       # entre canaux indépendants et refuse le dépôt si le recoupement échoue (exit != 0
       # -> le job échoue -> notification par e-mail au propriétaire du dépôt).
       - name: Régénérer le magasin CSCA
         run: python tools/csca/update_csca.py
+
+      # Invariant : mêmes éditions de masterlists => magasin STRICTEMENT identique.
+      # Un diff à éditions inchangées signale une dérive d'environnement (version de
+      # bibliothèque, etc.) — on échoue bruyamment au lieu d'ouvrir une PR trompeuse.
+      - name: Garde « mêmes éditions, même magasin »
+        run: |
+          grep '^#' app/src/main/assets/csca/MANIFEST.tsv > "$RUNNER_TEMP/editions-apres.txt"
+          if cmp -s "$RUNNER_TEMP/editions-avant.txt" "$RUNNER_TEMP/editions-apres.txt"; then
+            if [ -n "$(git status --porcelain -- app/src/main/assets/csca)" ]; then
+              echo "::error::Éditions des masterlists inchangées mais le magasin diffère — dérive d'environnement probable (version de cryptography ?). Aucune PR ouverte ; investiguer ce run."
+              git status --porcelain -- app/src/main/assets/csca | head -30
+              exit 1
+            fi
+          fi
 
       # Une masterlist tronquée ou une purge massive doit passer par une revue manuelle,
       # pas par une PR d'apparence anodine.

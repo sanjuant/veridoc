@@ -8,7 +8,8 @@ récapitulatif — le diff git d'une mise à jour montre précisément quels cer
 entrent et sortent, et chaque certificat est justifiable individuellement.
 
 Usage :  python tools/csca/update_csca.py            (depuis la racine du dépôt)
-Prérequis : python 3.10+, `pip install cryptography requests`, openssl dans le PATH.
+Prérequis : python 3.10+, `pip install -r tools/csca/requirements.txt` (versions
+ÉPINGLÉES — indispensables à une sortie reproductible), openssl dans le PATH.
 
 Sources (URLs pérennes, re-résolues à chaque exécution) :
   - Masterlist ICAO : le nom du fichier courant est scrapé depuis la page de
@@ -28,9 +29,13 @@ Garde-fous :
     ferait rejeter tout le bundle par CertificateFactory sur Android).
   - Les certificats de TEST de l'ANTS ne sont jamais inclus.
 """
+import base64
 import collections
+import dataclasses
+import datetime as dt
 import hashlib
 import io
+import os
 import re
 import subprocess
 import sys
@@ -39,6 +44,7 @@ import zipfile
 from pathlib import Path
 
 import requests
+import cryptography
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives.serialization import Encoding
@@ -141,7 +147,138 @@ def cn_of(name_obj):
         or (name_obj.rdns and name_obj.rdns[0].rfc4514_string()) or "sans-CN"
 
 
+# ---------- Métadonnées d'un certificat (cryptography, sinon repli openssl) ----------
+#
+# Les masterlists contiennent quelques CSCA légitimes à l'encodage laxiste (sérials DER
+# négatifs — Japon —, paramètres NULL sur ECDSA) que cryptography >= 43 REJETTE en dur.
+# Ces certificats sont pourtant signés dans les masterlists et lus sans problème par
+# BouncyCastle sur Android : on ne les jette pas, on extrait leurs métadonnées via
+# openssl (mêmes formats de sortie). Seul un certificat qu'openssl ne lit pas non plus
+# est écarté.
+
+@dataclasses.dataclass
+class CertMeta:
+    country: str
+    cn: str
+    subject: str
+    issuer: str
+    serial: str        # format "0x…" (négatif : "-0x…")
+    not_before: str    # AAAA-MM-JJ (affichage)
+    not_after: str     # AAAA-MM-JJ
+    sort_key: str      # horodatage complet (tri stable)
+    pem: bytes
+
+
+def _pem_of(der):
+    b64 = base64.b64encode(der).decode()
+    body = "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))
+    return f"-----BEGIN CERTIFICATE-----\n{body}\n-----END CERTIFICATE-----\n".encode()
+
+
+def _der_serial(der):
+    """Sérial lu directement dans le DER (INTEGER signé), indépendant du parseur."""
+    for _t, _s, cs, ce in iter_tlv(der, 0, len(der)):
+        for _t2, _s2, cs2, ce2 in iter_tlv(der, cs, ce):  # tbsCertificate
+            for t3, _s3, cs3, ce3 in iter_tlv(der, cs2, ce2):
+                if t3 == 0xA0:  # [0] version, optionnel
+                    continue
+                return int.from_bytes(der[cs3:ce3], "big", signed=True) if t3 == 0x02 else 0
+        break
+    return 0
+
+
+def _rdn(rfc2253, attr):
+    m = re.search(rf"(?:^|,){attr}=((?:\\.|[^,])+)", rfc2253)
+    return m.group(1) if m else None
+
+
+# openssl (RFC2253) nomme plus d'attributs que cryptography (rfc4514_string), qui ne
+# nomme que CN/L/ST/O/OU/C/STREET/DC/UID et met le reste en OID pointé. On aligne la
+# sortie du repli sur la convention cryptography pour une sortie identique bit à bit.
+_OPENSSL_NAME_TO_OID = {
+    "serialNumber": "2.5.4.5",
+    "SN": "2.5.4.4",
+    "GN": "2.5.4.42",
+    "givenName": "2.5.4.42",
+    "title": "2.5.4.12",
+    "initials": "2.5.4.43",
+    "generationQualifier": "2.5.4.44",
+    "x500UniqueIdentifier": "2.5.4.45",
+    "dnQualifier": "2.5.4.46",
+    "pseudonym": "2.5.4.65",
+    "emailAddress": "1.2.840.113549.1.9.1",
+}
+
+
+def _align_rfc4514(s):
+    for name, oid in _OPENSSL_NAME_TO_OID.items():
+        s = re.sub(rf"(^|[,+]){name}=", rf"\g<1>{oid}=", s)
+    return s
+
+
+def cert_meta_openssl(der):
+    fd, path = tempfile.mkstemp(suffix=".der")
+    try:
+        os.write(fd, der)
+        os.close(fd)
+        r = subprocess.run(
+            ["openssl", "x509", "-inform", "DER", "-in", path, "-noout",
+             "-subject", "-issuer", "-dates", "-nameopt", "RFC2253"],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            return None
+        info = dict(line.split("=", 1) for line in r.stdout.splitlines() if "=" in line)
+        subject = _align_rfc4514(info.get("subject", ""))
+        issuer = _align_rfc4514(info.get("issuer", ""))
+        nb = dt.datetime.strptime(re.sub(r"\s+", " ", info["notBefore"]).strip(), "%b %d %H:%M:%S %Y %Z")
+        na = dt.datetime.strptime(re.sub(r"\s+", " ", info["notAfter"]).strip(), "%b %d %H:%M:%S %Y %Z")
+        return CertMeta(
+            country=_rdn(subject, "C") or "XX",
+            cn=_rdn(subject, "CN") or "sans-CN",
+            subject=subject,
+            issuer=issuer,
+            serial=f"{_der_serial(der):#x}",
+            not_before=f"{nb:%Y-%m-%d}",
+            not_after=f"{na:%Y-%m-%d}",
+            sort_key=f"{nb:%Y-%m-%dT%H:%M:%S}",
+            pem=_pem_of(der),
+        )
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+def cert_meta(der):
+    try:
+        cert = x509.load_der_x509_certificate(der)
+        country = next(
+            (a.value for a in cert.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME)), "XX"
+        )
+        return CertMeta(
+            country=country,
+            cn=cn_of(cert.subject),
+            subject=cert.subject.rfc4514_string(),
+            issuer=cert.issuer.rfc4514_string(),
+            serial=f"{cert.serial_number:#x}",
+            not_before=f"{cert.not_valid_before_utc:%Y-%m-%d}",
+            not_after=f"{cert.not_valid_after_utc:%Y-%m-%d}",
+            sort_key=f"{cert.not_valid_before_utc:%Y-%m-%dT%H:%M:%S}",
+            pem=cert.public_bytes(Encoding.PEM),
+        )
+    except Exception as e:
+        meta = cert_meta_openssl(der)
+        if meta is not None:
+            print(f"  ATTENTION: gardé via repli openssl ({meta.subject[:70]}) — "
+                  f"cryptography a rejeté ce cert ({type(e).__name__})")
+        return meta
+
+
 def main():
+    print(f"cryptography {cryptography.__version__} (épinglée : voir tools/csca/requirements.txt)")
+    if not cryptography.__version__.startswith("42."):
+        print("  ATTENTION: version différente de l'épinglage — les certificats restent gardés"
+              " (repli openssl), mais installez requirements.txt pour une sortie reproductible.")
     print("== 1/4 Téléchargements ==")
     consent = requests.get(ICAO_DISCOVERY, headers=UA, timeout=60).text
     m = re.search(r"MasterList/ICAO_ML_\d+\.ml", consent)
@@ -208,14 +345,13 @@ def main():
         if h in seen:
             continue
         seen[h] = True
-        try:
-            cert = x509.load_der_x509_certificate(der)
-            c = next((a.value for a in cert.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME)), "XX")
-        except Exception:
+        meta = cert_meta(der)  # cryptography, sinon repli openssl — cf. commentaire plus haut
+        if meta is None:
+            print(f"  ÉCARTÉ (illisible même par openssl) : sha256={h}")
             bad += 1
             continue
-        countries[c] += 1
-        kept.append((c, cert, h, sources))
+        countries[meta.country] += 1
+        kept.append((meta, h, sources))
 
     if countries["FR"] < 5:
         sys.exit(f"ERREUR: seulement {countries['FR']} certs FR (>=5 attendus) — dépôt refusé")
@@ -225,7 +361,7 @@ def main():
         if old.exists():
             old.unlink()
 
-    kept.sort(key=lambda t: (t[0], cn_of(t[1].subject), t[1].not_valid_before_utc, t[2]))
+    kept.sort(key=lambda t: (t[0].country, t[0].cn, t[0].sort_key, t[1]))
     manifest = [
         "# Magasin CSCA — généré par tools/csca/update_csca.py",
         f"# Éditions : {source_detail['icao']}",
@@ -234,26 +370,26 @@ def main():
         "fichier\tpays\tsujet\tvalide_du\tvalide_au\tsha256\tsources",
     ]
     used_names = set()
-    for country, cert, h, sources in kept:
-        fname = f"{sanitize(country, 8)}_{sanitize(cn_of(cert.subject))}_{'-'.join(sources)}_{h[:8]}.pem"
+    for meta, h, sources in kept:
+        fname = f"{sanitize(meta.country, 8)}_{sanitize(meta.cn)}_{'-'.join(sources)}_{h[:8]}.pem"
         if fname.lower() in used_names:  # collision de préfixe SHA (improbable) -> empreinte longue
             fname = fname.replace(f"_{h[:8]}.pem", f"_{h[:16]}.pem")
         used_names.add(fname.lower())
         detail = [stable_detail.get(s) or f"ANTS {ants_by_hash[h]} ({ANTS[ants_by_hash[h]]})" for s in sources]
         header = (
             f"# Certificat CSCA — ancre de confiance passive authentication (ICAO 9303-11)\n"
-            f"# Sujet      : {cert.subject.rfc4514_string()}\n"
-            f"# Émetteur   : {cert.issuer.rfc4514_string()}\n"
-            f"# Série      : {cert.serial_number:#x}\n"
-            f"# Validité   : {cert.not_valid_before_utc:%Y-%m-%d} -> {cert.not_valid_after_utc:%Y-%m-%d}\n"
+            f"# Sujet      : {meta.subject}\n"
+            f"# Émetteur   : {meta.issuer}\n"
+            f"# Série      : {meta.serial}\n"
+            f"# Validité   : {meta.not_before} -> {meta.not_after}\n"
             f"# SHA-256    : {h}\n"
             + "".join(f"# Source     : {d}\n" for d in detail)
             + "# Date de dépôt : voir l'historique git de ce fichier ; détails : MANIFEST.tsv, README.txt\n"
         )
-        (OUT_DIR / fname).write_bytes(header.encode() + cert.public_bytes(Encoding.PEM))
+        (OUT_DIR / fname).write_bytes(header.encode() + meta.pem)
         manifest.append(
-            f"{fname}\t{country}\t{cert.subject.rfc4514_string()}\t"
-            f"{cert.not_valid_before_utc:%Y-%m-%d}\t{cert.not_valid_after_utc:%Y-%m-%d}\t{h}\t{'+'.join(sources)}"
+            f"{fname}\t{meta.country}\t{meta.subject}\t"
+            f"{meta.not_before}\t{meta.not_after}\t{h}\t{'+'.join(sources)}"
         )
     (OUT_DIR / "MANIFEST.tsv").write_text("\n".join(manifest) + "\n", encoding="utf-8", newline="\n")
 
