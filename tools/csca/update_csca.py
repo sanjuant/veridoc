@@ -274,9 +274,16 @@ def cert_meta(der):
         return meta
 
 
+def pinned_version(package):
+    req = Path(__file__).with_name("requirements.txt").read_text(encoding="utf-8")
+    m = re.search(rf"^{package}==(\S+)", req, re.M)
+    return m.group(1) if m else None
+
+
 def main():
-    print(f"cryptography {cryptography.__version__} (épinglée : voir tools/csca/requirements.txt)")
-    if not cryptography.__version__.startswith("42."):
+    pinned = pinned_version("cryptography")
+    print(f"cryptography {cryptography.__version__} (épinglée : {pinned} — tools/csca/requirements.txt)")
+    if pinned and cryptography.__version__ != pinned:
         print("  ATTENTION: version différente de l'épinglage — les certificats restent gardés"
               " (repli openssl), mais installez requirements.txt pour une sortie reproductible.")
     print("== 1/4 Téléchargements ==")

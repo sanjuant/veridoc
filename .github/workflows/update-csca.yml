@@ -31,9 +31,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Versions ÉPINGLÉES : cryptography >= 43 rejette des CSCA légitimes (sérials DER
-      # négatifs, paramètres NULL ECDSA) — une install non épinglée a produit une PR
-      # supprimant 7 certificats à sources inchangées.
+      # Versions ÉPINGLÉES À LA DERNIÈRE VERSION (reproductibilité, pas nostalgie) :
+      # une install flottante a produit une PR supprimant 7 certificats à sources
+      # inchangées. Le repli openssl de update_csca.py rend les bumps sûrs ; le garde
+      # « mêmes éditions, même magasin » ci-dessous attrape toute dérive résiduelle.
       - name: Dépendances Python (épinglées)
         run: |
           pip install -r tools/csca/requirements.txt

@@ -1,8 +1,12 @@
-# Versions ÉPINGLÉES : la génération du magasin CSCA doit être reproductible.
-# cryptography >= 43 rejette en dur des CSCA légitimes présentes dans les masterlists
-# signées (sérials DER négatifs — Japon —, paramètres NULL sur ECDSA : AT/DE/AE/JP) ;
-# la première exécution CI non épinglée a perdu 7 certificats (PR du 2026-07-09).
-# Le repli openssl de update_csca.py les garde désormais, mais l'épinglage évite
-# toute dérive de métadonnées entre environnements.
-cryptography==42.0.8
-requests==2.32.3
+# Versions ÉPINGLÉES À LA DERNIÈRE VERSION : l'épinglage sert la REPRODUCTIBILITÉ
+# (générer le magasin deux fois avec les mêmes sources doit donner le même résultat,
+# quel que soit le poste ou le runner) — pas à figer de vieilles versions.
+#
+# Mettre à jour librement : le repli openssl de update_csca.py garde les CSCA à
+# l'encodage laxiste (sérials DER négatifs, paramètres NULL ECDSA) que cryptography
+# rejette depuis la v43, avec une sortie identique bit à bit (vérifié sur 42.0.0,
+# 42.0.8 et 49.0.0). Si un futur bump changeait quand même la sortie, le garde
+# « mêmes éditions, même magasin » du workflow échoue bruyamment au lieu d'ouvrir
+# une PR trompeuse.
+cryptography==49.0.0
+requests==2.34.2
