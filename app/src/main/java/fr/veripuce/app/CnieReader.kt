@@ -300,7 +300,11 @@ class CnieReader {
         val issuer = dsc.issuerX500Principal
         return cscas.any { csca ->
             csca.subjectX500Principal == issuer &&
-                runCatching { dsc.verify(csca.publicKey); true }.getOrDefault(false)
+                runCatching { dsc.verify(csca.publicKey) }
+                    // Repli BouncyCastle : le provider Android par défaut ne gère pas
+                    // certaines courbes (brainpool) utilisées par des CSCA.
+                    .recoverCatching { dsc.verify(csca.publicKey, "BC") }
+                    .isSuccess
         }
     }
 

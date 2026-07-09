@@ -30,8 +30,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.security.Security
@@ -91,8 +93,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var originIcon: ImageView
     private lateinit var originLabel: TextView
 
-    /** Ancre de confiance CSCA (chargée depuis assets/csca/) pour prouver l'origine étatique. */
-    private var cscaCerts: Collection<java.security.cert.X509Certificate> = emptyList()
+    /**
+     * Ancre de confiance CSCA (assets/csca/, ~770 certificats) pour prouver l'origine étatique.
+     * Chargée en arrière-plan dès le lancement ; la lecture NFC l'attend via [Deferred.await].
+     */
+    private lateinit var cscaCerts: Deferred<Collection<java.security.cert.X509Certificate>>
 
     /** Retour du scan OCR : MRZ -> détection ; CAN -> pré-remplit le champ CAN. */
     private val scanLauncher =
@@ -191,7 +196,9 @@ class MainActivity : AppCompatActivity() {
         cloneLabel = findViewById(R.id.cloneLabel)
         originIcon = findViewById(R.id.originIcon)
         originLabel = findViewById(R.id.originLabel)
-        cscaCerts = CscaStore.load(this).certificates
+        cscaCerts = lifecycleScope.async(Dispatchers.IO) {
+            CscaStore.load(this@MainActivity).certificates
+        }
 
         val hasCamera = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
         scanMrz.visibility = if (hasCamera) View.VISIBLE else View.GONE
@@ -310,7 +317,7 @@ class MainActivity : AppCompatActivity() {
         showReading()
         resultCard.visibility = View.GONE
         readJob = lifecycleScope.launch(Dispatchers.IO) {
-            val result = runCatching { CnieReader().read(isoDep, req.key, req.expectedMrz, cscaCerts) }
+            val result = runCatching { CnieReader().read(isoDep, req.key, req.expectedMrz, cscaCerts.await()) }
             withContext(Dispatchers.Main) {
                 result
                     .onSuccess { showResult(it) }

@@ -73,11 +73,23 @@ Quatre vérifications indépendantes, reflétées par les chips de l'écran de r
 | **Intégrité** (empreintes = SOD signé) | Données de la puce **non altérées** | ✅ |
 | **Cohérence MRZ ↔ puce** | Le document imprimé correspond à la puce | ✅ |
 | **Anti-clone** (Chip / Active Authentication) | La puce n'est **pas un clone** | ✅ |
-| **Signature CSCA** (chaîne DSC → ANTS / ICAO PKD) | Document **émis par l'État** | 🚧 roadmap |
+| **Signature CSCA** (chaîne DSC → ANTS / ICAO PKD) | Document **émis par l'État** | ✅ |
 
 > La détection de clone repose surtout sur la **Chip Authentication** ; l'Active Authentication
-> (repli) est vérifiée pour les clés EC. La signature CSCA (origine étatique) reste à brancher.
+> (repli) est vérifiée pour les clés EC.
 > Toutes ces vérifications demandent une **validation sur documents réels** (non testable sans puce).
+
+### Magasin de confiance CSCA embarqué
+
+L'app embarque **773 certificats CSCA** (`assets/csca/csca-trusted.pem`), union dédupliquée de
+trois sources officielles indépendantes : la **masterlist ICAO**, la **masterlist BSI** (Allemagne)
+et les certificats **ANTS** (CSCA-FRANCE 2010→2025 + **eID-FRANCE** pour la CNIe, absente des
+masterlists « voyage »). Les CSCA françaises ont été **recoupées octet-pour-octet** entre les
+canaux au moment du dépôt. La signature du SOD est vérifiée (CMS), puis le certificat signataire
+(DSC) est chaîné jusqu'à une de ces CSCA : verdict **vert uniquement si l'origine étatique est
+prouvée** ; une signature valide sans chaîne connue reste neutre, une signature invalide est une
+anomalie dure. Mise à jour du magasin : `python tools/csca/update_csca.py` (les masterlists sont
+rééditées tous les 1 à 3 mois).
 
 ### Limites structurelles
 
@@ -192,14 +204,17 @@ Un bandeau « 100 % local » dans l'application ouvre le détail de ces garantie
 >
 > - **RGPD** : consentement de la personne concernée, minimisation, aucune conservation —
 >   voir les garanties techniques de la section Confidentialité.
-> - La vérification d'**origine étatique** (étape 3, chaîne CSCA) n'est pas encore active :
->   l'app prouve aujourd'hui l'intégrité interne du document, pas son émission par l'État.
+> - La vérification d'**origine étatique** (étape 3, chaîne CSCA) est active avec le magasin
+>   embarqué ; maintenir ce magasin à jour (`tools/csca/update_csca.py`) fait partie du
+>   cadre d'exploitation.
 
 ## Roadmap
 
-- [ ] **Signature CSCA** : signature du SOD et chaîne DSC → CSCA de confiance
-      (magasin ANTS / ICAO PKD embarqué) — origine étatique
+- [ ] Rafraîchissement périodique du magasin CSCA (les masterlists sont rééditées
+      tous les 1 à 3 mois) — envisager une action CI planifiée
 - [ ] Validation de l'anti-clone (Active Authentication RSA) sur documents réels
+- [x] **Signature CSCA** : signature du SOD et chaîne DSC → CSCA de confiance
+      (magasin ICAO + BSI + ANTS embarqué, 773 certs) — origine étatique
 - [ ] Migration AGP 9.x / API 37 quand l'écosystème AndroidX l'exigera
 - [x] Flux unique : scan MRZ → détection du type de document → lecture puce
 - [x] Cohérence MRZ optique ↔ puce (DG1)
