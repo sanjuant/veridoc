@@ -13,9 +13,9 @@ Veripuce lit la puce NFC d'une **carte nationale d'identité électronique** (fo
 **cryptographiquement** que les données n'ont pas été altérées (*passive authentication*).
 Aucun matériel externe : le téléphone sert de lecteur.
 
-| Écran principal | Scan OCR (viseur) | Résultat vérifié |
-|:---:|:---:|:---:|
-| ![Écran principal](docs/screen-main.png) | ![Scan OCR de la MRZ](docs/screen-scan.png) | ![Résultat vérifié](docs/screen-result.png) |
+| Écran principal | Scan OCR (viseur) | Document détecté | Résultat vérifié |
+|:---:|:---:|:---:|:---:|
+| ![Écran principal](docs/screen-main.png) | ![Scan OCR de la MRZ](docs/screen-scan.png) | ![Document détecté + invite NFC](docs/screen-detected.png) | ![Résultat vérifié](docs/screen-result.png) |
 
 *Captures d'écran avec des données fictives (spécimen ICAO 9303 et identité factice).*
 

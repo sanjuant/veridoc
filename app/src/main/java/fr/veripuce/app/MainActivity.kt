@@ -66,6 +66,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chipMrzValid: Chip
     private lateinit var canGroup: View
     private lateinit var canInput: TextInputEditText
+    private lateinit var nfcPrompt: View
+    private lateinit var nfcPromptText: TextView
 
     private lateinit var status: TextView
     private lateinit var statusIcon: ImageView
@@ -156,6 +158,8 @@ class MainActivity : AppCompatActivity() {
         chipMrzValid = findViewById(R.id.chipMrzValid)
         canGroup = findViewById(R.id.canGroup)
         canInput = findViewById(R.id.canInput)
+        nfcPrompt = findViewById(R.id.nfcPrompt)
+        nfcPromptText = findViewById(R.id.nfcPromptText)
         status = findViewById(R.id.status)
         statusIcon = findViewById(R.id.statusIcon)
         progress = findViewById(R.id.progress)
@@ -226,6 +230,9 @@ class MainActivity : AppCompatActivity() {
         }
         setChip(chipMrzValid, true, R.string.mrz_valid, R.string.mrz_valid, false)
         canGroup.visibility = if (isId) View.VISIBLE else View.GONE
+        // Invite claire à approcher la puce NFC (étape 2).
+        nfcPromptText.setText(if (isId) R.string.nfc_invite_id else R.string.nfc_invite_mrz)
+        nfcPrompt.visibility = View.VISIBLE
         detectedCard.visibility = View.VISIBLE
         showTapStatus()
         statusSetByScan = true
@@ -329,6 +336,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showResult(r: ReadResult) {
+        nfcPrompt.visibility = View.GONE // lecture faite : l'invite NFC n'a plus lieu d'être
         nameView.text = "${r.surname} ${r.givenNames}".trim()
         fields.text = buildString {
             appendLine("Doc : ${r.documentNumber}    Nat : ${r.nationality}")
@@ -359,11 +367,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Détection de clone.
+        // Détection de clone. « Non disponible » n'apporte rien à l'utilisateur et peut
+        // inquiéter -> on masque simplement le chip ; on ne l'affiche que sur un résultat
+        // net (authentique / échec).
         when (r.cloneCheck) {
-            CloneCheck.AUTHENTIC -> setChip(chipClone, true, R.string.chip_clone_ok, R.string.chip_clone_ok, false)
-            CloneCheck.FAILED -> setChip(chipClone, false, R.string.chip_clone_bad, R.string.chip_clone_bad, false)
-            CloneCheck.UNSUPPORTED -> setChip(chipClone, false, R.string.chip_clone_na, R.string.chip_clone_na, true)
+            CloneCheck.AUTHENTIC -> {
+                chipClone.visibility = View.VISIBLE
+                setChip(chipClone, true, R.string.chip_clone_ok, R.string.chip_clone_ok, false)
+            }
+            CloneCheck.FAILED -> {
+                chipClone.visibility = View.VISIBLE
+                setChip(chipClone, false, R.string.chip_clone_bad, R.string.chip_clone_bad, false)
+            }
+            CloneCheck.UNSUPPORTED -> chipClone.visibility = View.GONE
         }
 
         setChip(chipSignature, r.sodSignatureVerified, R.string.chip_sig_ok, R.string.chip_sig_unverified, true)

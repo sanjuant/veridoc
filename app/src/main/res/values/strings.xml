@@ -71,6 +71,8 @@
     <string name="can_needed_note">Le CAN (6 chiffres) est imprimé au **recto** de la carte — il ne figure pas dans la MRZ. Saisis-le ou scanne le recto.</string>
     <string name="tap_mrz">Approche le document du dos du téléphone, sans bouger.</string>
     <string name="tap_id">Renseigne le CAN, puis approche la carte du dos du téléphone.</string>
+    <string name="nfc_invite_mrz">Approche maintenant le dos du téléphone contre le document, et ne bouge plus.</string>
+    <string name="nfc_invite_id">Renseigne le CAN ci-dessus, puis approche le dos du téléphone contre la carte.</string>
     <string name="result_fail">Document suspect — une vérification a échoué.</string>
     <string name="result_unverified">Lu et cohérent — origine non vérifiée (signature CSCA à venir).</string>
     <string name="scan_first">Scanne d\'abord la MRZ, ou utilise la saisie manuelle.</string>
