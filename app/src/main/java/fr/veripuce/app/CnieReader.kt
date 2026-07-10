@@ -3,6 +3,7 @@ package fr.veripuce.app
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.nfc.tech.IsoDep
+import android.util.Log
 import com.gemalto.jp2.JP2Decoder
 import net.sf.scuba.smartcards.CardService
 import org.jmrtd.BACKey
@@ -48,6 +49,13 @@ enum class ReadStep(val percent: Int) {
 }
 
 class CnieReader {
+
+    private companion object {
+        const val TAG = "CnieReader"
+
+        /** Racine des OIDs PACE (BSI TR-03110) : .1/.2 = GM, .3/.4 = IM, .6 = CAM. */
+        const val OID_PACE = "0.4.0.127.0.7.2.2.4"
+    }
 
     /**
      * @param expectedMrz MRZ lue optiquement (scan), pour la comparer à la puce (DG1).
@@ -199,40 +207,79 @@ class CnieReader {
         }
     }
 
-    /** CNIe : PACE-CAN obligatoire. Le CAN = les 6 chiffres imprimés au recto. */
+    /** CNIe : PACE-CAN. Le CAN = les 6 chiffres imprimés au recto. */
     private fun openWithCan(service: PassportService, can: String) {
         require(can.length == 6 && can.all { it.isDigit() }) { "Le CAN doit faire 6 chiffres." }
-        val cardAccess = CardAccessFile(service.getInputStream(PassportService.EF_CARD_ACCESS, PassportService.DEFAULT_MAX_BLOCKSIZE))
-        val paceInfo = cardAccess.securityInfos.filterIsInstance<PACEInfo>().first()
-        service.doPACE(
-            PACEKeySpec.createCANKey(can),
-            paceInfo.objectIdentifier,
-            PACEInfo.toParameterSpec(paceInfo.parameterId),
-            null,
-        )
+        val paceInfos = readPaceInfos(service)
+        doPaceAny(service, PACEKeySpec.createCANKey(can), paceInfos, "CAN")
         service.sendSelectApplet(true)
     }
 
-    /** Passeport (ou carte acceptant PACE-MRZ) : clé dérivée de la MRZ, repli BAC si legacy. */
+    /** Passeport / carte acceptant PACE-MRZ : clé dérivée de la MRZ, repli BAC. */
     private fun openWithMrz(service: PassportService, mrz: AccessKey.Mrz) {
         val bacKey = BACKey(mrz.documentNumber, mrz.dateOfBirth, mrz.dateOfExpiry)
+        val paceInfos = readPaceInfos(service)
+
+        if (paceInfos.isNotEmpty()) {
+            val paceError = runCatching {
+                doPaceAny(service, PACEKeySpec.createMRZKey(bacKey), paceInfos, "MRZ")
+                service.sendSelectApplet(true)
+                return
+            }.exceptionOrNull()
+            // PACE-MRZ refusé partout : tenter BAC quand même (certains documents TD1
+            // l'acceptent) avant de remonter l'échec PACE d'origine.
+            runCatching {
+                service.sendSelectApplet(false)
+                service.doBAC(bacKey)
+                return
+            }
+            throw paceError!!
+        }
+        service.sendSelectApplet(false)
+        service.doBAC(bacKey)
+    }
+
+    private fun readPaceInfos(service: PassportService): List<PACEInfo> {
         val cardAccess = runCatching {
             CardAccessFile(service.getInputStream(PassportService.EF_CARD_ACCESS, PassportService.DEFAULT_MAX_BLOCKSIZE))
-        }.getOrNull()
-        val paceInfo = cardAccess?.securityInfos?.filterIsInstance<PACEInfo>()?.firstOrNull()
-
-        if (paceInfo != null) {
-            service.doPACE(
-                PACEKeySpec.createMRZKey(bacKey),
-                paceInfo.objectIdentifier,
-                PACEInfo.toParameterSpec(paceInfo.parameterId),
-                null,
-            )
-            service.sendSelectApplet(true)
-        } else {
-            service.sendSelectApplet(false)
-            service.doBAC(bacKey)
+        }.getOrNull() ?: return emptyList()
+        // EF.CardAccess peut annoncer PLUSIEURS protocoles PACE, et JMRTD les stocke
+        // dans un HashSet : « prendre le premier » est NON DÉTERMINISTE. On trie
+        // explicitement — GM d'abord (le Generic Mapping est le mieux éprouvé dans
+        // JMRTD ; ReadID et NFCPassportReader, GM-only, lisent la CNIe) — et on les
+        // essaiera TOUTES en cas de refus.
+        val infos = cardAccess.securityInfos.filterIsInstance<PACEInfo>().sortedBy { info ->
+            when {
+                info.objectIdentifier.startsWith("$OID_PACE.2.") -> 0 // ECDH-GM
+                info.objectIdentifier.startsWith("$OID_PACE.1.") -> 1 // DH-GM
+                info.objectIdentifier.startsWith("$OID_PACE.6.") -> 2 // ECDH-CAM
+                else -> 3                                             // IM et autres
+            }
         }
+        // Inventaire en clair (aucune donnée personnelle) : `adb logcat -s CnieReader`
+        // donne la réponse définitive sur le contenu d'EF.CardAccess d'une carte.
+        Log.i(TAG, "EF.CardAccess : " + infos.joinToString { "${it.objectIdentifier}/param=${it.parameterId}" })
+        return infos
+    }
+
+    /** Tente PACE sur chaque protocole annoncé ; ne relance que si TOUS refusent. */
+    private fun doPaceAny(
+        service: PassportService,
+        key: PACEKeySpec,
+        paceInfos: List<PACEInfo>,
+        label: String,
+    ) {
+        var lastError: Throwable? = null
+        for (info in paceInfos) {
+            try {
+                service.doPACE(key, info.objectIdentifier, PACEInfo.toParameterSpec(info.parameterId), null)
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "PACE-$label refusé (${info.objectIdentifier}) : ${e.message}")
+                lastError = e
+            }
+        }
+        throw lastError ?: IllegalStateException("Aucun protocole PACE annoncé par la puce")
     }
 
     /**
