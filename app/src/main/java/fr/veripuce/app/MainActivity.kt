@@ -412,7 +412,12 @@ class MainActivity : AppCompatActivity() {
         if (scanned != null) nfcPrompt.visibility = View.VISIBLE
         if (e is ChipAccessException) {
             when {
-                req.key is AccessKey.Mrz && scanned?.docType == MrzOcr.DocType.ID_CARD -> {
+                // Repli CAN pour TOUT document TD1 (carte d'identité ou titre de séjour) :
+                // le code document de la ligne 1 n'est protégé par aucun chiffre de
+                // contrôle, une confusion OCR (ID -> IO/I0) peut mal classer une CNIe —
+                // le filet de sécurité ne doit pas en dépendre.
+                req.key is AccessKey.Mrz && scanned != null &&
+                    scanned?.docType != MrzOcr.DocType.PASSPORT -> {
                     canFallback = true
                     canGroup.visibility = View.VISIBLE
                     nfcPromptText.setText(R.string.can_fallback)
@@ -433,7 +438,7 @@ class MainActivity : AppCompatActivity() {
     private fun buildRequest(): AccessRequest? {
         val mrz = scanned
         if (mrz != null) {
-            if (mrz.docType == MrzOcr.DocType.ID_CARD && canFallback) {
+            if (mrz.docType != MrzOcr.DocType.PASSPORT && canFallback) {
                 // Repli : la puce a refusé la clé MRZ -> le CAN (recto) devient requis.
                 val can = canInput.text?.toString()?.trim().orEmpty()
                 return if (can.length != 6 || !can.all { it.isDigit() }) {

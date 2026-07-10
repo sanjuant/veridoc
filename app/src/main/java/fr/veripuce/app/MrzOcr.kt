@@ -101,10 +101,16 @@ object MrzOcr {
                 if (checkOk(dob, m2.groupValues[2]) && checkOk(exp, m2.groupValues[5]) &&
                     plausibleDate(dob) && plausibleDate(exp)
                 ) {
-                    // Code « ID » = carte nationale (PACE-CAN) ; sinon titre de séjour
-                    // (clé MRZ, comme un passeport). En cas de doute, l'échec d'ouverture
-                    // MRZ révèle le champ CAN côté UI (filet de sécurité).
-                    val type = if (docCode == "ID") DocType.ID_CARD else DocType.RESIDENCE_PERMIT
+                    // Le code document n'est protégé par AUCUN chiffre de contrôle : une
+                    // confusion OCR y survit (« ID » lu « IO », « IB », « IQ »…). En France
+                    // (spécimens PRADO) : CNIe = « ID », titre de séjour = « IR » — on ne
+                    // classe donc en titre de séjour que les codes nets « IR » / « A? » /
+                    // « C? » ; tout autre « I? » est traité comme carte d'identité.
+                    val type = when {
+                        docCode.getOrNull(0) != 'I' -> DocType.RESIDENCE_PERMIT   // A?, C?
+                        docCode.getOrNull(1) == 'R' -> DocType.RESIDENCE_PERMIT   // IR net
+                        else -> DocType.ID_CARD                                    // ID + confusions
+                    }
                     return MrzData(doc.trimEnd('<'), dob, exp, type, state)
                 }
             }

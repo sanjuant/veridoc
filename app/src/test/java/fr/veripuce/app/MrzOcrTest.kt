@@ -88,11 +88,46 @@ class MrzOcrTest {
     }
 
     @Test
-    fun `TD1 - titre de sejour (code non ID) est un RESIDENCE_PERMIT`() {
+    fun `TD1 - titre de sejour (code IR net) est un RESIDENCE_PERMIT`() {
         // Code document "IR" (titre de séjour) -> clé MRZ, pas de CAN.
         val text = "IRFRAD231458907<<<<<<<<<<<<<<<\n7408122F1204159FRA<<<<<<<<<<6"
         val mrz = MrzOcr.findMrz(text)
         assertEquals(MrzOcr.MrzData("D23145890", "740812", "120415", RP, "FRA"), mrz)
+    }
+
+    @Test
+    fun `TD1 - specimen PRADO de la CNIe francaise 2021`() {
+        // FRA-BO-03001 (spécimen officiel ANTS, MRZ réelle).
+        val text = """
+            IDFRAX4RTBPFW46<<<<<<<<<<<<<<<
+            9007138F3002119FRA<<<<<<<<<<<6
+            MARTIN<<MAELYS<GAELLE<MARIE<<<
+        """.trimIndent()
+        val mrz = MrzOcr.findMrz(text)
+        assertEquals(MrzOcr.MrzData("X4RTBPFW4", "900713", "300211", ID, "FRA"), mrz)
+    }
+
+    @Test
+    fun `TD1 - specimen PRADO du titre de sejour francais`() {
+        // FRA-HO-09001 : code « IR », n° AGDREF 10 chiffres en données optionnelles.
+        val text = """
+            IRFRAK682T8YLO0<1105040043<<<<
+            7906123F1401073SEN<<<<<<<<<<<6
+            MARTIN<<CHRISTELLE<HELENE<LAUR
+        """.trimIndent()
+        val mrz = MrzOcr.findMrz(text)
+        assertEquals(MrzOcr.MrzData("K682T8YLO", "790612", "140107", RP, "FRA"), mrz)
+    }
+
+    @Test
+    fun `TD1 - code document avec confusion OCR (ID lu IO) reste une carte d'identite`() {
+        // Le code document n'a AUCUN chiffre de contrôle : « ID » mal lu (D -> O/B/Q)
+        // ne doit pas basculer une CNIe en titre de séjour (perte du repli CAN).
+        for (bad in listOf("IO", "IB", "IQ", "I<")) {
+            val text = "${bad}FRAX4RTBPFW46<<<<<<<<<<<<<<<\n9007138F3002119FRA<<<<<<<<<<<6"
+            val mrz = MrzOcr.findMrz(text)
+            assertEquals(ID as MrzOcr.DocType?, mrz?.docType)
+        }
     }
 
     @Test
