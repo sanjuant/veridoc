@@ -98,6 +98,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusIcon: ImageView
     private lateinit var progress: CircularProgressIndicator
 
+    /** Indicateur de lecture NFC : contact établi + progression par étapes. */
+    private lateinit var readingCard: MaterialCardView
+    private lateinit var readProgress: com.google.android.material.progressindicator.LinearProgressIndicator
+    private lateinit var readStep: TextView
+
     private lateinit var resultCard: MaterialCardView
     private lateinit var photo: ShapeableImageView
     private lateinit var nameView: TextView
@@ -210,6 +215,9 @@ class MainActivity : AppCompatActivity() {
         nfcPromptText = findViewById(R.id.nfcPromptText)
         statusCard = findViewById(R.id.statusCard)
         checksContainer = findViewById(R.id.checksContainer)
+        readingCard = findViewById(R.id.readingCard)
+        readProgress = findViewById(R.id.readProgress)
+        readStep = findViewById(R.id.readStep)
         status = findViewById(R.id.status)
         statusIcon = findViewById(R.id.statusIcon)
         progress = findViewById(R.id.progress)
@@ -314,6 +322,7 @@ class MainActivity : AppCompatActivity() {
         canFallback = false
         detectedCard.visibility = View.GONE
         resultCard.visibility = View.GONE
+        readingCard.visibility = View.GONE
         scanCard.visibility = View.VISIBLE
         helpBtn.visibility = View.VISIBLE
         canInput.text = null
@@ -364,13 +373,31 @@ class MainActivity : AppCompatActivity() {
         showReading()
         resultCard.visibility = View.GONE
         readJob = lifecycleScope.launch(Dispatchers.IO) {
-            val result = runCatching { CnieReader().read(isoDep, req.key, req.expectedMrz, cscaCerts.await()) }
+            val result = runCatching {
+                CnieReader().read(isoDep, req.key, req.expectedMrz, cscaCerts.await()) { step ->
+                    runOnUiThread { showReadStep(step) }
+                }
+            }
             withContext(Dispatchers.Main) {
                 result
                     .onSuccess { showResult(it) }
                     .onFailure { onReadFailure(it, req) }
             }
         }
+    }
+
+    /** Progression de lecture : barre + libellé de l'étape en cours. */
+    private fun showReadStep(step: ReadStep) {
+        readProgress.setProgressCompat(step.percent, true)
+        readStep.setText(
+            when (step) {
+                ReadStep.CONNECT -> R.string.reading_connect
+                ReadStep.IDENTITY -> R.string.reading_identity
+                ReadStep.PHOTO -> R.string.reading_photo
+                ReadStep.SECURITY -> R.string.reading_security
+                ReadStep.VERIFY -> R.string.reading_verify
+            },
+        )
     }
 
     /**
@@ -380,6 +407,9 @@ class MainActivity : AppCompatActivity() {
      * (voir [ChipAccessException]).
      */
     private fun onReadFailure(e: Throwable, req: AccessRequest) {
+        readingCard.visibility = View.GONE
+        // L'invite NFC redevient utile : il faut représenter le document.
+        if (scanned != null) nfcPrompt.visibility = View.VISIBLE
         if (e is ChipAccessException) {
             when {
                 req.key is AccessKey.Mrz && scanned?.docType == MrzOcr.DocType.ID_CARD -> {
@@ -497,6 +527,7 @@ class MainActivity : AppCompatActivity() {
     private fun showResult(r: ReadResult) {
         // Étape 3 : ne laisser à l'écran QUE le verdict + la carte résultat (et le bouton
         // « Nouveau contrôle ») — tout le reste est du bruit pour le conseiller.
+        readingCard.visibility = View.GONE
         nfcPrompt.visibility = View.GONE
         detectedCard.visibility = View.GONE
         scanCard.visibility = View.GONE
@@ -592,12 +623,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun warn(text: String) = setStatus(text, R.drawable.ic_state_error, R.color.on_bad_container)
 
+    /** Contact NFC établi : indicateur bien visible, l'invite et le statut s'effacent. */
     private fun showReading() {
-        statusCard.visibility = View.VISIBLE
-        progress.visibility = View.VISIBLE
-        statusIcon.visibility = View.GONE
-        status.text = getString(R.string.reading)
-        checksContainer.visibility = View.GONE
+        statusCard.visibility = View.GONE
+        nfcPrompt.visibility = View.GONE
+        readingCard.visibility = View.VISIBLE
+        readProgress.setProgressCompat(ReadStep.CONNECT.percent, false)
+        readStep.setText(R.string.reading_connect)
     }
 
     private fun setStatus(text: String, @DrawableRes icon: Int, @ColorRes tint: Int) {

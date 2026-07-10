@@ -35,19 +35,34 @@ import java.security.cert.X509Certificate
  * (PACE-CAN pour la CNIe, PACE-MRZ / BAC pour le passeport) -> lecture des data groups
  * -> passive authentication (intégrité), cohérence MRZ optique/puce, détection de clone.
  */
+/**
+ * Étapes d'une lecture, émises au fil de l'eau pour l'indicateur de progression.
+ * [percent] : progression approximative (la photo domine le temps de lecture).
+ */
+enum class ReadStep(val percent: Int) {
+    CONNECT(8),    // ouverture de session sécurisée (PACE/BAC)
+    IDENTITY(22),  // DG1 (état civil / MRZ)
+    PHOTO(38),     // DG2 (photo, le plus long)
+    SECURITY(78),  // DG13/14/15 + EF.SOD
+    VERIFY(92),    // passive authentication + anti-clone
+}
+
 class CnieReader {
 
     /**
      * @param expectedMrz MRZ lue optiquement (scan), pour la comparer à la puce (DG1).
      *                    null si aucune comparaison n'est demandée.
+     * @param onStep      callback de progression (appelé depuis le thread de lecture).
      */
     fun read(
         isoDep: IsoDep,
         key: AccessKey,
         expectedMrz: MrzOcr.MrzData? = null,
         cscaCerts: Collection<X509Certificate> = emptyList(),
+        onStep: ((ReadStep) -> Unit)? = null,
     ): ReadResult {
         isoDep.timeout = 15_000
+        onStep?.invoke(ReadStep.CONNECT)
 
         val cardService = CardService.getInstance(isoDep)
         var service: PassportService? = null
@@ -83,7 +98,9 @@ class CnieReader {
             }
 
             // 2) Lecture des data groups sur octets BRUTS on-card (cf. passive auth).
+            onStep?.invoke(ReadStep.IDENTITY)
             val dg1Bytes = readEf(svc, PassportService.EF_DG1)!!
+            onStep?.invoke(ReadStep.PHOTO)
             val dg2Bytes = readEf(svc, PassportService.EF_DG2)!!
             val dg1 = DG1File(dg1Bytes.inputStream())
             val dg2 = DG2File(dg2Bytes.inputStream())
@@ -94,6 +111,7 @@ class CnieReader {
             // DG13 (France), DG14 (Chip Authentication), DG15 (Active Authentication) :
             // optionnels selon le document. Lus en brut, inclus dans l'intégrité s'ils
             // existent (le SOD les référence).
+            onStep?.invoke(ReadStep.SECURITY)
             val dg13Bytes = readEf(svc, PassportService.EF_DG13)
             val dg13 = dg13Bytes?.let { runCatching { Dg13Parser.parse(it) }.getOrNull() }
             val dg14Bytes = readEf(svc, PassportService.EF_DG14)
@@ -104,6 +122,7 @@ class CnieReader {
             // 3) Passive authentication.
             //    (a) intégrité : hashs recalculés == hashs signés du SOD.
             val sodBytes = svc.getInputStream(PassportService.EF_SOD, PassportService.DEFAULT_MAX_BLOCKSIZE).readBytes()
+            onStep?.invoke(ReadStep.VERIFY)
             val sod = SODFile(sodBytes.inputStream())
             val integrityOk = verifyDataGroupHashes(
                 sod,
