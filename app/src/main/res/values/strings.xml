@@ -28,7 +28,6 @@
     <string name="enter_can">Saisis d\'abord le CAN (6 chiffres).</string>
     <string name="enter_mrz">Renseigne le n° de document et les 2 dates (AAMMJJ).</string>
     <string name="reading">Lecture en cours… garde le document immobile.</string>
-    <string name="done">Lecture terminée.</string>
     <string name="read_error">Échec : %1$s</string>
 
     <!-- Scan OCR -->
@@ -81,8 +80,8 @@
     <string name="access_denied_mrz_id">La puce a refusé la clé MRZ — saisis le CAN pour continuer.</string>
     <string name="access_denied_can">Accès refusé — vérifie le CAN (6 chiffres au recto), puis réapproche la carte.</string>
     <string name="access_denied_mrz">Accès refusé — vérifie que la MRZ scannée correspond bien au document, puis réapproche-le.</string>
-    <string name="result_fail">Anomalie détectée — ne pas accepter ce document.</string>
-    <string name="result_unverified">Contrôles internes OK. Compare la photo et les informations avec la personne en face.</string>
+    <string name="result_fail">Anomalie détectée — ne pas accepter ce document</string>
+    <string name="result_unverified">Contrôles internes OK — compare avec la personne en face</string>
 
     <!-- Vérifications en langage clair (pour un contrôle par une personne non technique) -->
     <string name="check_integrity_ok">Données non modifiées</string>
@@ -95,7 +94,8 @@
     <string name="check_origin_ok">Émis par l\'État (signature vérifiée)</string>
     <string name="check_origin_untrusted">Signature valide, autorité émettrice non reconnue</string>
     <string name="check_origin_invalid">Signature invalide — document falsifié&#160;!</string>
-    <string name="result_trusted">Document authentique — émis par l\'État.</string>
+    <!-- Verdict court : le détail (« Émis par l'État (signature vérifiée) ») est listé juste dessous. -->
+    <string name="result_trusted">Document authentique</string>
     <string name="expired_badge">DOCUMENT EXPIRÉ</string>
     <string name="lbl_born">Né(e) le</string>
     <string name="lbl_expires">Expire le</string>

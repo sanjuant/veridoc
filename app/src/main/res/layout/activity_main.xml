@@ -545,21 +545,24 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
+                <!-- Mêmes gabarits que les lignes de vérification (icône 24dp, corps large,
+                     retrait 12dp) pour un alignement en colonne ; le verdict se distingue
+                     par la graisse, pas par une taille moindre. -->
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/progress"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="14dp"
+                    android:layout_marginEnd="12dp"
                     android:visibility="gone"
-                    app:indicatorSize="22dp"
+                    app:indicatorSize="24dp"
                     app:trackThickness="3dp"
                     tools:visibility="visible" />
 
                 <ImageView
                     android:id="@+id/statusIcon"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_marginEnd="14dp"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="12dp"
                     android:importantForAccessibility="no"
                     android:src="@drawable/ic_state_info" />
 
@@ -568,8 +571,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/scan_prompt"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textStyle="bold" />
                 </LinearLayout>
 
                 <!-- Détail des vérifications, affiché avec le verdict (résultat uniquement). -->
