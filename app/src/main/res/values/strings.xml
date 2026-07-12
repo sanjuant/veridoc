@@ -85,6 +85,7 @@
     <string name="access_denied_mrz_id">La puce a refusé la clé MRZ — saisis le CAN pour continuer.</string>
     <string name="access_denied_can">Accès refusé — vérifie le CAN (6 chiffres au recto), puis réapproche la carte.</string>
     <string name="access_denied_mrz">Accès refusé — vérifie que la MRZ scannée correspond bien au document, puis réapproche-le.</string>
+    <string name="read_interrupted">Lecture interrompue — réapproche la carte du dos du téléphone et ne bouge plus.</string>
     <string name="result_fail">Anomalie détectée — ne pas accepter ce document</string>
     <string name="result_unverified">Contrôles internes OK — compare avec la personne en face</string>
 

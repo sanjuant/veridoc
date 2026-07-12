@@ -87,19 +87,13 @@ class CnieReader {
             service = svc
             svc.open()
 
-            // 1) Ouverture de la session sécurisée selon le type de clé. Un refus de la
-            //    clé (PACE/BAC) est signalé par une exception dédiée pour que l'UI puisse
-            //    proposer un repli (ex. CAN) — mais PAS sur une simple perte de contact.
-            try {
-                when (key) {
-                    is AccessKey.Can -> openWithCan(svc, key.can)
-                    is AccessKey.Mrz -> openWithMrz(svc, key)
-                }
-            } catch (e: Exception) {
-                val tagLost = generateSequence(e as Throwable) { it.cause }
-                    .any { it is android.nfc.TagLostException }
-                if (tagLost) throw e
-                throw ChipAccessException(e)
+            // 1) Ouverture de la session sécurisée selon le type de clé. openWith* ne lève
+            //    ChipAccessException QUE sur un refus de clé avéré (SW 6300) : un aléa
+            //    transitoire (perte de contact, glitch NFC) remonte tel quel -> l'UI invite
+            //    à re-présenter la carte sans proposer le CAN.
+            when (key) {
+                is AccessKey.Can -> openWithCan(svc, key.can)
+                is AccessKey.Mrz -> openWithMrz(svc, key, expectedMrz)
             }
 
             // 2) Lecture des data groups sur octets BRUTS on-card (cf. passive auth).
@@ -208,32 +202,97 @@ class CnieReader {
     private fun openWithCan(service: PassportService, can: String) {
         require(can.length == 6 && can.all { it.isDigit() }) { "Le CAN doit faire 6 chiffres." }
         val paceInfos = readPaceInfos(service)
-        doPaceAny(service, PACEKeySpec.createCANKey(can), paceInfos)
-        service.sendSelectApplet(true)
+        when (val outcome = tryPace(service, PACEKeySpec.createCANKey(can), paceInfos)) {
+            PaceOutcome.Success -> service.sendSelectApplet(true)
+            is PaceOutcome.KeyRefused -> throw ChipAccessException(outcome.error)  // mauvais CAN
+            is PaceOutcome.Failed -> throw outcome.error ?: IllegalStateException("PACE-CAN impossible")
+        }
     }
 
-    /** Passeport / carte acceptant PACE-MRZ : clé dérivée de la MRZ, repli BAC. */
-    private fun openWithMrz(service: PassportService, mrz: AccessKey.Mrz) {
-        val bacKey = BACKey(mrz.documentNumber, mrz.dateOfBirth, mrz.dateOfExpiry)
+    /**
+     * Passeport / carte acceptant PACE-MRZ : clé dérivée de la MRZ.
+     *
+     * Pour une carte d'identité TD1, le numéro de document a pu être mal lu sur une paire
+     * de glyphes aveugle au chiffre de contrôle (G/6, L/1…) — on retente donc PACE avec
+     * des variantes du numéro avant de conclure au refus. BAC en dernier recours (jamais
+     * pour une CNIe française, qui n'a pas de BAC).
+     */
+    private fun openWithMrz(service: PassportService, mrz: AccessKey.Mrz, expectedMrz: MrzOcr.MrzData?) {
         val paceInfos = readPaceInfos(service)
+        // État émetteur si (et seulement si) le document est une carte d'identité TD1.
+        val idCardState = expectedMrz?.takeIf { it.docType == MrzOcr.DocType.ID_CARD }?.issuingState
+        val isIdCard = idCardState != null
+        val isFrenchIdCard = idCardState.equals("FRA", ignoreCase = true)
 
-        if (paceInfos.isNotEmpty()) {
-            val paceError = runCatching {
-                doPaceAny(service, PACEKeySpec.createMRZKey(bacKey), paceInfos)
-                service.sendSelectApplet(true)
-                return
-            }.exceptionOrNull()
-            // PACE-MRZ refusé partout : tenter BAC quand même (certains documents TD1
-            // l'acceptent) avant de remonter l'échec PACE d'origine.
+        if (paceInfos.isEmpty()) {
+            // Aucun PACE annoncé -> document ancien en BAC (jamais une CNIe FRA).
+            service.sendSelectApplet(false)
+            service.doBAC(BACKey(mrz.documentNumber, mrz.dateOfBirth, mrz.dateOfExpiry))
+            return
+        }
+
+        val candidates = if (isIdCard) {
+            MrzKeyCandidates.documentNumberCandidates(mrz.documentNumber)
+        } else {
+            listOf(mrz.documentNumber)
+        }
+
+        var refusal: Throwable? = null
+        for (docNumber in candidates) {
+            val key = PACEKeySpec.createMRZKey(BACKey(docNumber, mrz.dateOfBirth, mrz.dateOfExpiry))
+            when (val outcome = tryPace(service, key, paceInfos)) {
+                PaceOutcome.Success -> { service.sendSelectApplet(true); return }
+                is PaceOutcome.KeyRefused -> refusal = outcome.error   // clé fausse -> candidat suivant
+                // Échec non-6300 (protocole/aléa) : les variantes n'y changeront rien,
+                // on remonte tel quel -> l'UI invite à re-présenter la carte.
+                is PaceOutcome.Failed -> throw outcome.error ?: IllegalStateException("PACE-MRZ impossible")
+            }
+        }
+
+        // Tous les candidats MRZ refusés (6300). BAC en dernier recours, sauf CNIe FRA.
+        if (!isFrenchIdCard) {
             runCatching {
                 service.sendSelectApplet(false)
-                service.doBAC(bacKey)
+                service.doBAC(BACKey(mrz.documentNumber, mrz.dateOfBirth, mrz.dateOfExpiry))
                 return
             }
-            throw paceError!!
         }
-        service.sendSelectApplet(false)
-        service.doBAC(bacKey)
+        throw ChipAccessException(refusal ?: IllegalStateException("PACE-MRZ refusé"))
+    }
+
+    /** Issue d'une tentative PACE (multi-protocoles) pour une clé donnée. */
+    private sealed interface PaceOutcome {
+        object Success : PaceOutcome
+        /** Clé refusée (SW 6300) : essayer un autre PROTOCOLE ne sert à rien, la clé est fausse. */
+        data class KeyRefused(val error: Throwable) : PaceOutcome
+        /** Aucun protocole n'a abouti sans que ce soit un refus de clé (protocole rejeté, aléa). */
+        data class Failed(val error: Throwable?) : PaceOutcome
+    }
+
+    /**
+     * Tente PACE sur chaque protocole annoncé (GM d'abord) pour UNE clé.
+     * - succès -> [PaceOutcome.Success] ;
+     * - 6300/63Cx -> [PaceOutcome.KeyRefused] immédiat (inutile de changer de protocole) ;
+     * - rejet de protocole (MSE:Set AT) -> protocole suivant ;
+     * - perte de contact NFC -> exception relancée telle quelle (transitoire).
+     */
+    private fun tryPace(
+        service: PassportService,
+        key: PACEKeySpec,
+        paceInfos: List<PACEInfo>,
+    ): PaceOutcome {
+        var lastError: Throwable? = null
+        for (info in paceInfos) {
+            try {
+                service.doPACE(key, info.objectIdentifier, PACEInfo.toParameterSpec(info.parameterId), null)
+                return PaceOutcome.Success
+            } catch (e: Exception) {
+                if (PaceError.isTagLost(e)) throw e
+                if (PaceError.isKeyRefused(e)) return PaceOutcome.KeyRefused(e)
+                lastError = e   // protocole rejeté ou aléa -> essayer le protocole suivant
+            }
+        }
+        return PaceOutcome.Failed(lastError)
     }
 
     private fun readPaceInfos(service: PassportService): List<PACEInfo> {
@@ -254,24 +313,6 @@ class CnieReader {
             }
         }
         return infos
-    }
-
-    /** Tente PACE sur chaque protocole annoncé ; ne relance que si TOUS refusent. */
-    private fun doPaceAny(
-        service: PassportService,
-        key: PACEKeySpec,
-        paceInfos: List<PACEInfo>,
-    ) {
-        var lastError: Throwable? = null
-        for (info in paceInfos) {
-            try {
-                service.doPACE(key, info.objectIdentifier, PACEInfo.toParameterSpec(info.parameterId), null)
-                return
-            } catch (e: Exception) {
-                lastError = e
-            }
-        }
-        throw lastError ?: IllegalStateException("Aucun protocole PACE annoncé par la puce")
     }
 
     /**

@@ -3,6 +3,7 @@ package fr.veripuce.app
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Tests du parseur MRZ/CAN.
@@ -117,6 +118,25 @@ class MrzOcrTest {
         """.trimIndent()
         val mrz = MrzOcr.findMrz(text)
         assertEquals(MrzOcr.MrzData("K682T8YLO", "790612", "140107", RP, "FRA"), mrz)
+    }
+
+    @Test
+    fun `TD1 - angle mort du checksum ICAO - G lu 6 passe checkOk (documente le probleme)`() {
+        // Construit une ligne 1 TD1 valide pour un numéro donné (dob/exp du spécimen PRADO).
+        fun td1(doc: String): String {
+            val c = MrzKeyCandidates.icaoCheckDigit(doc)
+            val line1 = "IDFRA$doc$c".padEnd(30, '<')
+            val line2 = "9007138F3002119FRA".padEnd(29, '<') + "6"
+            return "$line1\n$line2"
+        }
+        val withG = MrzOcr.findMrz(td1("X4RTGPFW4"))
+        val with6 = MrzOcr.findMrz(td1("X4RT6PFW4"))
+        // Les DEUX lectures passent tous les chiffres de contrôle ICAO : le checksum ne
+        // peut PAS distinguer un « G » lu « 6 ». C'est l'angle mort que compensent les
+        // candidats PACE (MrzKeyCandidates) et le vote par position (MrzVote).
+        assertEquals("X4RTGPFW4", withG?.documentNumber)
+        assertEquals("X4RT6PFW4", with6?.documentNumber)
+        assertTrue(MrzKeyCandidates.differOnlyByBlindPairs(withG!!.documentNumber, with6!!.documentNumber))
     }
 
     @Test

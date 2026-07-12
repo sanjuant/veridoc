@@ -429,7 +429,10 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        warn(getString(R.string.read_error, e.message ?: "?"))
+        // Échec NON avéré comme un refus de clé (perte de contact, glitch NFC, lecture
+        // interrompue) : inviter à re-présenter la carte, SANS proposer le CAN — la clé
+        // MRZ est conservée pour le prochain essai.
+        warn(getString(R.string.read_interrupted))
     }
 
     private data class AccessRequest(val key: AccessKey, val expectedMrz: MrzOcr.MrzData?)
