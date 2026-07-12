@@ -3,6 +3,8 @@ package fr.veripuce.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -79,6 +81,11 @@ class ScanActivity : AppCompatActivity() {
     @Volatile private var lastAnalysisRes: String? = null
     @Volatile private var lastAnalysisRot: Int = 0
 
+    /** Géométrie du viseur (snapshot pour recadrer l'image d'analyse hors du thread UI). */
+    @Volatile private var roiRatio = 4.0f
+    @Volatile private var roiWidthFraction = 0.94f
+    @Volatile private var roiVerticalBias = 0.42f
+
     /** Repli : renvoyer à la saisie manuelle (lumière insuffisante, MRZ illisible…). */
     private fun requestManualEntry() {
         if (finished.compareAndSet(false, true)) {
@@ -129,6 +136,10 @@ class ScanActivity : AppCompatActivity() {
                 // bande MRZ à cadrer est le bas du document.
                 showCardPlaceholder = true
             }
+            // Même géométrie pour recadrer l'image d'analyse sur cette fenêtre (§ analyze).
+            roiRatio = windowRatio
+            roiWidthFraction = windowWidthFraction
+            roiVerticalBias = windowVerticalBias
         }
 
         // Repli manuel (toujours dispo) et lampe torche (utile en basse lumière).
@@ -205,13 +216,15 @@ class ScanActivity : AppCompatActivity() {
             proxy.close()
             return
         }
-        lastAnalysisRes = "${media.width}x${media.height}"
         lastAnalysisRot = proxy.imageInfo.rotationDegrees
         // Qualité de capture (plan Y, sans conversion bitmap) : torche auto en basse
         // lumière, indice de reflet sur le polycarbonate de la CNIe.
         runCatching { captureQuality(media) }.getOrNull()?.let(::updateCaptureHints)
 
-        val image = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
+        // On RECADRE sur la fenêtre du viseur avant l'OCR : sur une trame 12 Mpx, la MRZ
+        // n'est qu'une lamelle -> ML Kit lit mal. Le crop densifie les caractères OCR-B.
+        val image = runCatching { mrzCrop(proxy) }.getOrNull()
+        if (image == null) { proxy.close(); return }
         recognizer.process(image)
             .addOnSuccessListener { result ->
                 // L'ordre des blocs ML Kit n'est pas garanti : reconstruire le texte
@@ -224,6 +237,28 @@ class ScanActivity : AppCompatActivity() {
                 onText(sorted)
             }
             .addOnCompleteListener { proxy.close() } // libère l'image dans tous les cas
+    }
+
+    /**
+     * Convertit la trame en bitmap redressé, puis recadre sur la fenêtre du viseur.
+     * ML Kit reçoit ainsi une image petite et dense (la MRZ en gros), au lieu d'une
+     * trame 12 Mpx où les caractères OCR-B sont minuscules. Les bitmaps intermédiaires
+     * sont recyclés pour limiter la pression GC.
+     */
+    private fun mrzCrop(proxy: ImageProxy): InputImage {
+        val rot = proxy.imageInfo.rotationDegrees
+        val sensor = proxy.toBitmap()
+        val upright = if (rot == 0) {
+            sensor
+        } else {
+            Bitmap.createBitmap(sensor, 0, 0, sensor.width, sensor.height, Matrix().apply { postRotate(rot.toFloat()) }, true)
+                .also { if (it !== sensor) sensor.recycle() }
+        }
+        val roi = ScanRoi.mrzRoi(upright.width, upright.height, roiRatio, roiWidthFraction, roiVerticalBias)
+        val crop = Bitmap.createBitmap(upright, roi.left, roi.top, roi.width, roi.height)
+            .also { if (it !== upright) upright.recycle() }
+        lastAnalysisRes = "${crop.width}x${crop.height} (ROI de ${proxy.width}x${proxy.height})"
+        return InputImage.fromBitmap(crop, 0)
     }
 
     /** Appelé sur le thread principal (callbacks ML Kit) — pas de course sur l'état. */
