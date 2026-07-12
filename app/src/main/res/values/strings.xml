@@ -84,6 +84,7 @@
     <string name="nfc_invite_mrz">Approche maintenant le dos du téléphone contre le document, et ne bouge plus.</string>
     <string name="can_fallback">Cette carte demande le CAN : saisis les 6 chiffres imprimés au recto, puis approche à nouveau la carte.</string>
     <string name="access_denied_mrz_id">La puce a refusé la clé MRZ — saisis le CAN pour continuer.</string>
+    <string name="can_after_retries">La lecture par la MRZ échoue de façon répétée. Saisis le CAN (6 chiffres au recto) et réapproche la carte.</string>
     <string name="access_denied_can">Accès refusé — vérifie le CAN (6 chiffres au recto), puis réapproche la carte.</string>
     <string name="access_denied_mrz">Accès refusé — vérifie que la MRZ scannée correspond bien au document, puis réapproche-le.</string>
     <string name="read_interrupted">Lecture interrompue — réapproche la carte du dos du téléphone et ne bouge plus.</string>

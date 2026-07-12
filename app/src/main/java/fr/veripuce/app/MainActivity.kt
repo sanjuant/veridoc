@@ -72,6 +72,9 @@ class MainActivity : AppCompatActivity() {
      */
     private var canFallback = false
 
+    /** Nombre d'échecs de lecture par clé MRZ pour la carte courante (réinitialisé par carte). */
+    private var mrzFailures = 0
+
     /** Statut posé par le retour de scan : ne pas l'écraser au onResume qui suit. */
     private var statusSetByScan = false
 
@@ -321,6 +324,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun onMrzScanned(mrz: MrzOcr.MrzData) {
         scanned = mrz
+        mrzFailures = 0
         diagCollector = null   // nouvelle carte -> nouveau collecteur de diagnostic
         resultCard.visibility = View.GONE
         diagCard.visibility = View.GONE
@@ -360,6 +364,7 @@ class MainActivity : AppCompatActivity() {
     private fun resetToScan() {
         scanned = null
         canFallback = false
+        mrzFailures = 0
         diagCollector = null
         lastReport = null
         detectedCard.visibility = View.GONE
@@ -450,44 +455,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Échec de lecture. Cas particulier : une carte d'identité qui refuse la clé MRZ
-     * (rare — les CNIe acceptent normalement PACE-MRZ) -> on fait apparaître le champ
-     * CAN et on invite à réessayer. Une perte de contact NFC ne passe PAS par ici
-     * (voir [ChipAccessException]).
+     * Échec de lecture. Deux natures d'échec :
+     *  - refus de clé avéré ([ChipAccessException], SW 6300) : la clé MRZ est fausse ;
+     *  - aléa transitoire (perte de contact, TagLost) : la carte a « décroché ».
+     *
+     * Pour une carte d'identité (qui a un CAN), on propose le repli CAN dès un refus avéré,
+     * MAIS AUSSI après quelques échecs transitoires RÉPÉTÉS : certaines cartes échouent
+     * durablement en PACE-MRZ (ex. PACE-GM brainpool qui time-out en TagLost à chaque essai)
+     * et le CAN est alors le seul chemin qui fonctionne — il ne doit pas rester inaccessible.
+     * Un aléa unique invite simplement à re-présenter la carte, sans basculer sur le CAN.
      */
     private fun onReadFailure(e: Throwable, req: AccessRequest) {
         readingCard.visibility = View.GONE
         // L'invite NFC redevient utile : il faut représenter le document.
         if (scanned != null) nfcPrompt.visibility = View.VISIBLE
+
+        val keyRefused = e is ChipAccessException
+        if (req.key is AccessKey.Mrz) mrzFailures++   // compteur d'échecs MRZ de la carte courante
+
         // Classification finale pour le rapport : refus avéré vs aléa transitoire.
         diagCollector?.apply {
-            classification = if (e is ChipAccessException) "refus avéré (6300)" else "transitoire"
+            classification = if (keyRefused) "refus avéré (6300)" else "transitoire"
             if (finalAccess == null) finalAccess = "échec"
         }
         assembleReport(chip = null)
-        if (e is ChipAccessException) {
-            when {
-                // Repli CAN pour TOUT document TD1 (carte d'identité ou titre de séjour) :
-                // le code document de la ligne 1 n'est protégé par aucun chiffre de
-                // contrôle, une confusion OCR (ID -> IO/I0) peut mal classer une CNIe —
-                // le filet de sécurité ne doit pas en dépendre.
-                req.key is AccessKey.Mrz && scanned != null &&
-                    scanned?.docType != MrzOcr.DocType.PASSPORT -> {
-                    canFallback = true
-                    canGroup.visibility = View.VISIBLE
-                    nfcPromptText.setText(R.string.can_fallback)
-                    nfcPrompt.visibility = View.VISIBLE
-                    warn(getString(R.string.access_denied_mrz_id))
-                }
-                req.key is AccessKey.Can -> warn(getString(R.string.access_denied_can))
-                else -> warn(getString(R.string.access_denied_mrz))
+
+        val card = scanned
+        // Document TD1 (carte d'identité / titre de séjour) : il a un CAN. Le code document
+        // n'a aucun chiffre de contrôle, donc on ne se fie pas au type exact — tout ce qui
+        // n'est pas un passeport peut avoir un CAN.
+        val hasCan = req.key is AccessKey.Mrz && card != null && card.docType != MrzOcr.DocType.PASSPORT
+        when {
+            hasCan && (keyRefused || mrzFailures >= MRZ_FAILURES_BEFORE_CAN) -> {
+                canFallback = true
+                canGroup.visibility = View.VISIBLE
+                nfcPromptText.setText(R.string.can_fallback)
+                nfcPrompt.visibility = View.VISIBLE
+                warn(getString(if (keyRefused) R.string.access_denied_mrz_id else R.string.can_after_retries))
             }
-            return
+            req.key is AccessKey.Can -> warn(getString(R.string.access_denied_can))
+            keyRefused -> warn(getString(R.string.access_denied_mrz))   // passeport : pas de CAN
+            else -> warn(getString(R.string.read_interrupted))          // aléa unique : re-présenter
         }
-        // Échec NON avéré comme un refus de clé (perte de contact, glitch NFC, lecture
-        // interrompue) : inviter à re-présenter la carte, SANS proposer le CAN — la clé
-        // MRZ est conservée pour le prochain essai.
-        warn(getString(R.string.read_interrupted))
     }
 
     // ---- Rapport de diagnostic technique caviardé ----
@@ -578,6 +587,8 @@ class MainActivity : AppCompatActivity() {
         const val PREF_DIAG_MODE = "diag_mode"
         const val PREF_SALT = "corr_salt"
         const val INCLUDE_EXPIRY_YEAR = true
+        /** Échecs de clé MRZ consécutifs (carte d'identité) avant de proposer le CAN. */
+        const val MRZ_FAILURES_BEFORE_CAN = 2
         const val OCR_ENGINE = "mlkit-text-recognition 16.0.1 (latin, bundled)"
         const val LIBS = "JMRTD 0.8.6, scuba-sc-android 0.0.26, ML Kit 16.0.1, BouncyCastle 1.84"
     }
