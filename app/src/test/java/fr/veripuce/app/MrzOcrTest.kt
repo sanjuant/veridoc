@@ -199,4 +199,31 @@ class MrzOcrTest {
     fun `CAN - deux candidats distincts = ambigu`() {
         assertNull(MrzOcr.findCan("111111\n222222"))
     }
+
+    // ---------- Diagnostic (mode diagnostic caméra) ----------
+
+    @Test
+    fun `diagnose - une MRZ valide est reconnue`() {
+        assertEquals("MRZ reconnue ✓", MrzOcr.diagnose("L898902C36UTO7408122F1204159ZE184226B<<<<<10"))
+    }
+
+    @Test
+    fun `diagnose - signale le champ dont le chiffre de controle echoue`() {
+        // Même ligne mais chiffre de contrôle de naissance faux (3 au lieu de 2).
+        val d = MrzOcr.diagnose("L898902C36UTO7408123F1204159ZE184226B<<<<<10")
+        assertTrue(d.startsWith("TD3"), d)
+        assertTrue(d.contains("n° OK"), d)
+        assertTrue(d.contains("naissance KO"), d)
+        assertTrue(d.contains("exp OK"), d)
+    }
+
+    @Test
+    fun `diagnose - texte sans structure MRZ`() {
+        assertTrue(MrzOcr.diagnose("123456789012345678901234567890").contains("aucune séquence MRZ"))
+    }
+
+    @Test
+    fun `diagnose - trop peu de caracteres`() {
+        assertTrue(MrzOcr.diagnose("ABC12").contains("trop peu"))
+    }
 }

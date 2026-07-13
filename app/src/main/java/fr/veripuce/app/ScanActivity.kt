@@ -54,6 +54,8 @@ class ScanActivity : AppCompatActivity() {
         const val EXTRA_PERMISSION_PERMANENT = "permission_permanent"
         const val EXTRA_CAMERA_UNAVAILABLE = "camera_unavailable"
         const val EXTRA_MANUAL_REQUESTED = "manual_requested"
+        /** Mode diagnostic actif (propagé depuis MainActivity) : affiche l'OCR brut à l'écran. */
+        const val EXTRA_DIAG = "diag"
     }
 
     /** Moteur OCR (Tesseract + modèle OCR-B). Construit paresseusement SUR le thread d'analyse
@@ -66,6 +68,10 @@ class ScanActivity : AppCompatActivity() {
 
     private var camera: Camera? = null
     private var torchOn = false
+
+    /** Mode diagnostic : bandeau live du texte OCR brut (aide au débogage d'une lecture ratée). */
+    private var diagMode = false
+    private var diagOverlay: TextView? = null
 
     /** CAN : pas de checksum -> même valeur exigée sur 2 images consécutives. */
     private var lastCan: String? = null
@@ -118,6 +124,12 @@ class ScanActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scan)
+
+        // Mode diagnostic (propagé par MainActivity) : afficher en direct le texte OCR brut.
+        diagMode = intent.getBooleanExtra(EXTRA_DIAG, false)
+        if (diagMode) {
+            diagOverlay = findViewById<TextView>(R.id.diagOverlay).apply { visibility = View.VISIBLE }
+        }
 
         findViewById<TextView>(R.id.scanHint).setText(
             if (mode == MODE_CAN) R.string.scan_hint_can else R.string.scan_hint_mrz
@@ -241,8 +253,32 @@ class ScanActivity : AppCompatActivity() {
 
         val text = engine.recognize(crop)
         crop.recycle()
-        // onText doit tourner sur le thread principal (setResult/finish, état du vote).
-        if (text != null && !finished.get()) runOnUiThread { onText(text) }
+        if (finished.get()) return
+        // Retour sur le thread principal : bandeau diagnostic (données réelles -> diag only) puis
+        // traitement du texte (setResult/finish, état du vote).
+        if (diagMode || text != null) runOnUiThread {
+            if (diagMode) showDiagOverlay(text)
+            if (!finished.get() && text != null) onText(text)
+        }
+    }
+
+    /**
+     * Mode diagnostic : affiche en direct le texte OCR BRUT lu sur la bande MRZ + un verdict
+     * ([MrzOcr.diagnose]) — pour que l'utilisateur comprenne pourquoi ça ne se lit pas (police
+     * mal reconnue, ligne manquante, chiffre de contrôle KO). Montre des données réelles : réservé
+     * au mode diagnostic, jamais dans le rapport partageable.
+     */
+    private fun showDiagOverlay(raw: String?) {
+        val view = diagOverlay ?: return
+        val status = when {
+            raw.isNullOrBlank() -> "✗ rien lu — cadrage / netteté / lumière ?"
+            mode == MODE_CAN -> if (MrzOcr.findCan(raw) != null) "✓ CAN reconnu" else "✗ CAN non trouvé"
+            else -> MrzOcr.diagnose(raw)
+        }
+        view.text = buildString {
+            append("OCR diag · ").append(status)
+            if (!raw.isNullOrBlank()) append('\n').append(raw.trim())
+        }
     }
 
     /**

@@ -17,6 +17,26 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Bandeau diagnostic (mode diag uniquement) : texte OCR brut lu sur la bande MRZ +
+         verdict, pour comprendre un échec de lecture. Affiche des données réelles -> masqué
+         par défaut, activé seulement en mode diagnostic. -->
+    <TextView
+        android:id="@+id/diagOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_margin="12dp"
+        android:background="#CC000000"
+        android:ellipsize="end"
+        android:fontFamily="monospace"
+        android:maxLines="7"
+        android:padding="10dp"
+        android:textColor="#FF66FF66"
+        android:textSize="11sp"
+        android:visibility="gone"
+        tools:text="OCR diag · TD1 vue — n° KO · dates OK"
+        tools:visibility="visible" />
+
     <TextView
         android:id="@+id/scanHint"
         android:layout_width="match_parent"

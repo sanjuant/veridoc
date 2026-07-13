@@ -314,7 +314,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun launchScan(mode: String) {
         scanLauncher.launch(
-            Intent(this, ScanActivity::class.java).putExtra(ScanActivity.EXTRA_MODE, mode)
+            Intent(this, ScanActivity::class.java)
+                .putExtra(ScanActivity.EXTRA_MODE, mode)
+                .putExtra(ScanActivity.EXTRA_DIAG, diagMode)   // bandeau OCR live si diag actif
         )
     }
 

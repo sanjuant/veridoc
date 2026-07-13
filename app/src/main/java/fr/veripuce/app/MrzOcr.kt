@@ -132,6 +132,48 @@ object MrzOcr {
         return candidates.singleOrNull()
     }
 
+    /**
+     * Diagnostic LISIBLE de ce que l'OCR tire de la bande MRZ — pour le mode diagnostic, afin
+     * que l'utilisateur comprenne POURQUOI une carte ne se lit pas (police mal reconnue, ligne
+     * manquante, chiffre de contrôle faux…). Purement descriptif : n'accepte/ne renvoie aucune
+     * donnée exploitée en aval. Le verdict « reconnue » fait autorité via [findMrz].
+     */
+    fun diagnose(rawText: String): String {
+        if (findMrz(rawText) != null) return "MRZ reconnue ✓"
+        val joined = rawText.uppercase().replace('«', '<')
+            .filter { it in 'A'..'Z' || it in '0'..'9' || it == '<' }
+        if (joined.length < 10) return "trop peu de caractères lisibles (${joined.length})"
+
+        // Une séquence TD3 (passeport) est-elle repérée, et quel champ cloche ?
+        for (i in joined.indices) {
+            val m = TD3_SEQ.matchAt(joined, i) ?: continue
+            val doc = checkOk(m.groupValues[1], m.groupValues[2])
+            val dob = checkOk(fixDigits(m.groupValues[4]), m.groupValues[5])
+            val exp = checkOk(fixDigits(m.groupValues[7]), m.groupValues[8])
+            return "TD3 vue — n° ${chk(doc)} · naissance ${chk(dob)} · exp ${chk(exp)}"
+        }
+        // Sinon une ligne document TD1 (carte / titre de séjour) ?
+        for (i in joined.indices) {
+            val m1 = TD1_DOC.matchAt(joined, i) ?: continue
+            val doc = checkOk(m1.groupValues[3], m1.groupValues[4])
+            val end = minOf(joined.length, m1.range.last + 46)
+            var dates: Boolean? = null
+            for (j in (m1.range.last + 1) until end) {
+                val m2 = TD1_DATES.matchAt(joined, j) ?: continue
+                dates = checkOk(fixDigits(m2.groupValues[1]), m2.groupValues[2]) &&
+                    checkOk(fixDigits(m2.groupValues[4]), m2.groupValues[5])
+                break
+            }
+            return when (dates) {
+                null -> "TD1 vue — n° ${chk(doc)} · ligne dates absente"
+                else -> "TD1 vue — n° ${chk(doc)} · dates ${chk(dates)}"
+            }
+        }
+        return "${joined.length} car. lus, aucune séquence MRZ"
+    }
+
+    private fun chk(ok: Boolean): String = if (ok) "OK" else "KO"
+
     /** Plausibilité d'une date AAMMJJ (mois 1-12, jour 1-31) — barrière anti-faux-positif. */
     private fun plausibleDate(d: String): Boolean {
         if (d.length != 6 || d.any { !it.isDigit() }) return false
