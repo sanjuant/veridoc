@@ -81,6 +81,12 @@ class MainActivity : AppCompatActivity() {
     private var mrzCandidateCount = 1
     private var lastPreferIm = false
 
+    /** Échecs MRZ TRANSITOIRES consécutifs (gel/TagLost). Au-delà de [FREEZE_BEFORE_CAN], la carte
+     *  est traitée comme « gèle sur MRZ » : on cesse d'itérer les variantes et on exige le CAN
+     *  (fiable, instantané) plutôt que de grinder ~12 tentatives de 6 s. Un refus NET (6300) ne
+     *  compte pas : la boucle in-tap des candidats reste rapide pour ces cartes-là. */
+    private var mrzFreezeCount = 0
+
     /** N° de tentative de lecture pour la carte courante (indicateur visuel « essai N »). */
     private var readAttempt = 0
 
@@ -337,6 +343,7 @@ class MainActivity : AppCompatActivity() {
         scanned = mrz
         mrzFailures = 0
         mrzOffset = 0
+        mrzFreezeCount = 0
         readAttempt = 0
         // Variantes à itérer si la clé MRZ échoue (carte d'identité uniquement, cf. openWithMrz).
         mrzCandidateCount = if (mrz.docType == MrzOcr.DocType.ID_CARD)
@@ -383,6 +390,7 @@ class MainActivity : AppCompatActivity() {
         mrzFailures = 0
         mrzOffset = 0
         mrzCandidateCount = 1
+        mrzFreezeCount = 0
         readAttempt = 0
         diagCollector = null
         lastReport = null
@@ -518,6 +526,9 @@ class MainActivity : AppCompatActivity() {
                 keyRefused -> mrzOffset = mrzCandidateCount
                 lastPreferIm -> mrzOffset++
             }
+            // Gel (échec transitoire, pas un refus net) : compter les gels consécutifs. Au-delà
+            // du seuil, la carte « gèle sur MRZ » -> on cessera d'itérer (cf. buildRequest).
+            if (!keyRefused) mrzFreezeCount++
         }
 
         // Classification finale pour le rapport : refus avéré vs aléa transitoire.
@@ -641,6 +652,9 @@ class MainActivity : AppCompatActivity() {
         const val PREF_DIAG_MODE = "diag_mode"
         const val PREF_SALT = "corr_salt"
         const val INCLUDE_EXPIRY_YEAR = true
+        /** Gels (TagLost) consécutifs en PACE-MRZ avant de forcer le CAN (carte qui « gèle sur
+         *  MRZ » : GM original + IM original + 1 variante -> le CAN plutôt que grinder les 12). */
+        const val FREEZE_BEFORE_CAN = 3
         const val OCR_ENGINE = "tesseract 5 LSTM + modèle OCR-B/MRZ (bundled)"
         const val LIBS = "JMRTD 0.8.6, scuba-sc-android 0.0.26, Tesseract4Android 4.9.0, BouncyCastle 1.84"
     }
@@ -653,15 +667,18 @@ class MainActivity : AppCompatActivity() {
         if (mrz != null) {
             if (mrz.docType != MrzOcr.DocType.PASSPORT && canFallback) {
                 // Repli proposé. Si le CAN (recto) est saisi, on l'utilise — clé FIABLE, sans
-                // ambiguïté de glyphe. Sinon on NE bloque pas tout de suite : on retente la clé
-                // MRZ en itérant les VARIANTES du numéro (une par tap) tant qu'il en reste, PUIS
-                // on attend le CAN pour ne plus boucler sur une puce qui gèle en PACE-MRZ.
+                // ambiguïté de glyphe.
                 val can = canInput.text?.toString()?.trim().orEmpty()
                 if (can.length == 6 && can.all { it.isDigit() }) {
                     return AccessRequest(AccessKey.Can(can), mrz)
                 }
-                if (mrzOffset >= mrzCandidateCount) {
-                    warn(getString(R.string.enter_can)); return null   // variantes épuisées
+                // Sinon, on exige le CAN (plus de tentative MRZ) quand : la carte GÈLE sur MRZ
+                // (assez de gels consécutifs -> inutile de grinder les variantes ; le CAN est le
+                // chemin fiable), OU quand toutes les variantes ont été épuisées. Une carte qui
+                // REFUSE proprement (6300) n'incrémente pas mrzFreezeCount : ses variantes ont été
+                // essayées vite (boucle in-tap) et mrzOffset atteint déjà le total.
+                if (mrzFreezeCount >= FREEZE_BEFORE_CAN || mrzOffset >= mrzCandidateCount) {
+                    warn(getString(R.string.enter_can)); return null
                 }
                 // sinon : nouvelle tentative MRZ (variante mrzOffset ci-dessous), CAN proposé.
             }
