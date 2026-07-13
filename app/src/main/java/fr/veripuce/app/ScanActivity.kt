@@ -26,17 +26,15 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Scan OCR plein écran : détecte le CAN (mode [MODE_CAN]) ou la MRZ (mode [MODE_MRZ])
- * et renvoie le résultat à l'appelant. 100 % on-device (ML Kit bundled) — aucune image
- * ne quitte l'appareil. La saisie manuelle reste le repli : annuler = retour simple.
+ * et renvoie le résultat à l'appelant. 100 % on-device (Tesseract + modèle OCR-B embarqué,
+ * cf. [TesseractOcrEngine]) — aucune image ne quitte l'appareil. La saisie manuelle reste le
+ * repli : annuler = retour simple.
  */
 class ScanActivity : AppCompatActivity() {
 
@@ -58,7 +56,10 @@ class ScanActivity : AppCompatActivity() {
         const val EXTRA_MANUAL_REQUESTED = "manual_requested"
     }
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    /** Moteur OCR (Tesseract + modèle OCR-B). Construit paresseusement SUR le thread d'analyse
+     *  (init JNI coûteux) -> jamais touché depuis le thread UI hormis [onDestroy]. */
+    @Volatile private var ocr: OcrEngine? = null
+    private var ocrInitFailed = false
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val finished = AtomicBoolean(false)
     private val hintHandler = Handler(Looper.getMainLooper())
@@ -219,33 +220,39 @@ class ScanActivity : AppCompatActivity() {
         }
         lastAnalysisRot = proxy.imageInfo.rotationDegrees
         // On RECADRE sur la fenêtre du viseur avant l'OCR : sur une trame 12 Mpx, la MRZ
-        // n'est qu'une lamelle -> ML Kit lit mal. Le crop densifie les caractères OCR-B.
+        // n'est qu'une lamelle -> l'OCR lit mal. Le crop densifie les caractères OCR-B.
         // La qualité (reflet/lumière) est mesurée SUR CE CROP (la MRZ, mate et éclairée),
         // pas sur toute l'image : le corps brillant de la carte et le fond sombre ne
         // doivent pas déclencher de fausse alerte reflet ni de fausse basse-lumière.
-        val image = runCatching { mrzCropAndAssess(proxy) }.getOrNull()
-        if (image == null) { proxy.close(); return }
-        recognizer.process(image)
-            .addOnSuccessListener { result ->
-                // L'ordre des blocs ML Kit n'est pas garanti : reconstruire le texte
-                // avec les lignes triées de haut en bas (essentiel pour la MRZ TD1,
-                // dont le n° de document précède les dates).
-                val sorted = result.textBlocks
-                    .flatMap { it.lines }
-                    .sortedBy { it.boundingBox?.top ?: 0 }
-                    .joinToString("\n") { it.text }
-                onText(sorted)
-            }
-            .addOnCompleteListener { proxy.close() } // libère l'image dans tous les cas
+        val crop = runCatching { mrzCropAndAssess(proxy) }.getOrNull()
+        proxy.close()                              // trame copiée dans le bitmap -> libérable
+        if (crop == null) return
+
+        // Init paresseuse du moteur OCR SUR ce thread d'analyse (mono-thread) : l'init JNI est
+        // coûteux, on le fait une seule fois, sans course. Un échec d'init (rare : modèle
+        // embarqué) coupe l'OCR -> l'utilisateur bascule en saisie manuelle après le délai.
+        val engine = ocr ?: run {
+            if (ocrInitFailed) { crop.recycle(); return }
+            val created = TesseractOcrEngine.create(this)
+            if (created == null) { ocrInitFailed = true; crop.recycle(); return }
+            ocr = created
+            created
+        }
+
+        val text = engine.recognize(crop)
+        crop.recycle()
+        // onText doit tourner sur le thread principal (setResult/finish, état du vote).
+        if (text != null && !finished.get()) runOnUiThread { onText(text) }
     }
 
     /**
-     * Convertit la trame en bitmap redressé, puis recadre sur la fenêtre du viseur.
-     * ML Kit reçoit ainsi une image petite et dense (la MRZ en gros), au lieu d'une
-     * trame 12 Mpx où les caractères OCR-B sont minuscules. Les bitmaps intermédiaires
-     * sont recyclés pour limiter la pression GC.
+     * Convertit la trame en bitmap redressé, recadre sur la fenêtre du viseur, puis applique
+     * le prétraitement (niveaux de gris + contraste). Le moteur OCR reçoit ainsi une image
+     * petite et dense (la MRZ en gros), au lieu d'une trame 12 Mpx où les caractères OCR-B
+     * sont minuscules. Les bitmaps intermédiaires sont recyclés pour limiter la pression GC ;
+     * l'appelant devient propriétaire du bitmap renvoyé (à recycler après l'OCR).
      */
-    private fun mrzCropAndAssess(proxy: ImageProxy): InputImage {
+    private fun mrzCropAndAssess(proxy: ImageProxy): Bitmap {
         val rot = proxy.imageInfo.rotationDegrees
         val sensor = proxy.toBitmap()
         val upright = if (rot == 0) {
@@ -266,13 +273,14 @@ class ScanActivity : AppCompatActivity() {
         // faible contraste (cf. MrzImage). Recycle le crop brut.
         val enhanced = enhanceMrz(crop)
         lastAnalysisRes = "${w}x${h} contraste↑ (ROI de ${proxy.width}x${proxy.height})"
-        return InputImage.fromBitmap(enhanced, 0)
+        return enhanced
     }
 
     /**
      * Niveaux de gris + étirement de contraste (percentiles robustes, cf. [MrzImage]) du crop
-     * MRZ, avant de le passer à ML Kit. Un seul balayage pour l'histogramme, un second pour
-     * appliquer la LUT. Le bitmap source est recyclé ; un nouveau bitmap gris est renvoyé.
+     * MRZ, avant de le passer au moteur OCR (Tesseract binarise ensuite en interne, et un bon
+     * contraste aide son seuillage). Un balayage pour l'histogramme, un second pour appliquer
+     * la LUT. Le bitmap source est recyclé ; un nouveau bitmap gris est renvoyé.
      */
     private fun enhanceMrz(src: Bitmap): Bitmap {
         val w = src.width
@@ -430,7 +438,11 @@ class ScanActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         hintHandler.removeCallbacksAndMessages(null)
+        // Attendre la fin de l'analyse en cours AVANT de libérer Tesseract (non thread-safe :
+        // recycle() pendant une reconnaissance planterait le natif).
         analysisExecutor.shutdown()
-        recognizer.close()
+        runCatching { analysisExecutor.awaitTermination(600, TimeUnit.MILLISECONDS) }
+        ocr?.close()
+        ocr = null
     }
 }

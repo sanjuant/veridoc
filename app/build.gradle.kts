@@ -25,6 +25,13 @@ android {
                     .inputStream.bufferedReader().readText().trim()
             }.getOrNull()?.takeIf { it.isNotBlank() } ?: "dev"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
+
+        // Tesseract embarque des .so par ABI. On se limite aux ABIs des téléphones réels
+        // (arm64 + arm 32 bits) ; x86/x86_64 ne servent qu'à l'émulateur -> exclus pour
+        // alléger l'APK. Un banquier lit sur un vrai appareil arm.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildFeatures {
@@ -99,13 +106,18 @@ dependencies {
     // 1.18.0 = dernière version pour compileSdk 36 (1.19+ exige l'API 37 et AGP 9.1).
     implementation("androidx.core:core-ktx:1.18.0")
 
-    // Scan OCR du CAN / de la MRZ : CameraX + ML Kit Text Recognition en mode BUNDLED
-    // (modèle embarqué -> 100 % on-device et hors-ligne, aucune image ne quitte le
-    // téléphone, fonctionne sans Play Services ; +~4 Mo d'APK, assumé pour une app d'identité).
+    // Scan OCR du CAN / de la MRZ : CameraX pour la caméra + Tesseract 5 (LSTM) piloté par un
+    // modèle OCR-B dédié (assets/tessdata/mrz.traineddata) pour lire la police des MRZ.
+    // Remplace ML Kit (recognizer latin générique), qui produisait de gros ratés sur l'OCR-B
+    // (état « FRA » lu « LEF », numéro tout en lettres) forçant le repli CAN.
+    // 100 % on-device et hors-ligne : l'AAR Tesseract4Android ne déclare AUCUNE permission.
     implementation("androidx.camera:camera-camera2:1.6.1")
     implementation("androidx.camera:camera-lifecycle:1.6.1")
     implementation("androidx.camera:camera-view:1.6.1")
-    implementation("com.google.mlkit:text-recognition:16.0.1")
+    // Tesseract4Android (JitPack, déjà déclaré dans settings.gradle.kts). Apache-2.0 ; natif
+    // ~7 Mo/ABI, runtime C++ statique (pas de libc++_shared). Variante « Standard »
+    // (mono-thread) : suffisante pour une seule petite bande MRZ par trame.
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("com.google.android.material:material:1.14.0")
 
